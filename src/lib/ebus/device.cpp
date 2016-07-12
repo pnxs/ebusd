@@ -303,7 +303,7 @@ result_t NetworkDevice::open()
 	if (m_udp) {
 		struct sockaddr_in address = m_address;
 		address.sin_addr.s_addr = INADDR_ANY;
-		ret = bind(m_fd, (struct sockaddr*)&address, sizeof(address));
+		ret = ::bind(m_fd, (struct sockaddr*)&address, sizeof(address));
 	} else {
 		int value = 1;
 		ret = setsockopt(m_fd, IPPROTO_TCP, TCP_NODELAY, (void*)&value, sizeof(value));
