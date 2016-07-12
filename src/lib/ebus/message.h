@@ -83,7 +83,7 @@ public:
 	 * @param pollPriority the priority for polling, or 0 for no polling at all.
 	 * @param condition the @a Condition for this message, or NULL.
 	 */
-	Message(const string circuit, const string name,
+	Message(const string& circuit, const string& name,
 			const bool isWrite, const bool isPassive, const string comment,
 			const unsigned char srcAddress, const unsigned char dstAddress,
 			const vector<unsigned char> id,
@@ -103,7 +103,7 @@ public:
 	 * @param data the @a DataField for encoding/decoding the message.
 	 * @param deleteData whether to delete the @a DataField during destruction.
 	 */
-	Message(const string circuit, const string name,
+	Message(const string& circuit, const string& name,
 			const bool isWrite, const bool isPassive,
 			const unsigned char pb, const unsigned char sb,
 			DataField* data, const bool deleteData);

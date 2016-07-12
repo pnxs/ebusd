@@ -346,8 +346,8 @@ public:
 	 * @param partType the message part in which the field is stored.
 	 * @param length the number of symbols in the message part in which the field is stored.
 	 */
-	SingleDataField(const string name, const string comment,
-			const string unit, const dataType_t dataType, const PartType partType,
+	SingleDataField(const string& name, const string& comment,
+			const string& unit, const dataType_t dataType, const PartType partType,
 			const unsigned char length)
 		: DataField(name, comment),
 		  m_unit(unit), m_dataType(dataType), m_partType(partType),

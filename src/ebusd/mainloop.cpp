@@ -41,7 +41,7 @@ static const char* columnNames[] = {
 /** the number of known column names. */
 static const size_t columnCount = sizeof(columnNames) / sizeof(char*);
 
-MainLoop::MainLoop(const struct options opt, Device *device, MessageMap* messages)
+MainLoop::MainLoop(const struct options& opt, Device *device, MessageMap* messages)
 	: m_device(device), m_messages(messages), m_address(opt.address), m_scanConfig(opt.scanConfig), m_enableHex(opt.enableHex)
 {
 	// setup Device

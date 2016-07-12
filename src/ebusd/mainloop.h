@@ -42,8 +42,7 @@ public:
 	 * @param device the @a Device instance.
 	 * @param messages the @a MessageMap instance.
 	 */
-	MainLoop(const struct options opt, Device *device, MessageMap* messages);
-
+	MainLoop(const struct options& opt, Device *device, MessageMap* messages);
 
 	/**
 	 * Run the main loop.

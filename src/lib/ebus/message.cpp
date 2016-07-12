@@ -46,7 +46,7 @@ using std::dec;
 
 extern DataFieldTemplates* getTemplates(const string filename);
 
-Message::Message(const string circuit, const string name,
+Message::Message(const string& circuit, const string& name,
 		const bool isWrite, const bool isPassive, const string comment,
 		const unsigned char srcAddress, const unsigned char dstAddress,
 		const vector<unsigned char> id,
@@ -76,7 +76,7 @@ Message::Message(const string circuit, const string name,
 	m_key = key;
 }
 
-Message::Message(const string circuit, const string name,
+Message::Message(const string& circuit, const string& name,
 		const bool isWrite, const bool isPassive,
 		const unsigned char pb, const unsigned char sb,
 		DataField* data, const bool deleteData)
