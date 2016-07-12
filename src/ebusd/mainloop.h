@@ -23,6 +23,8 @@
 #include "network.h"
 #include "bushandler.h"
 
+#include <memory>
+
 /** \file mainloop.h */
 
 //using namespace std;
@@ -42,10 +44,6 @@ public:
 	 */
 	MainLoop(const struct options opt, Device *device, MessageMap* messages);
 
-	/**
-	 * Destructor.
-	 */
-	~MainLoop();
 
 	/**
 	 * Run the main loop.
@@ -61,7 +59,7 @@ public:
 private:
 
 	/** the @a Device instance. */
-	Device* m_device;
+	std::unique_ptr<Device> m_device;
 
 	/** the @a MessageMap instance. */
 	MessageMap* m_messages;
@@ -76,10 +74,10 @@ private:
 	const bool m_enableHex;
 
 	/** the created @a BusHandler instance. */
-	BusHandler* m_busHandler;
+	std::unique_ptr<BusHandler> m_busHandler;
 
 	/** the created @a Network instance. */
-	Network* m_network;
+	std::unique_ptr<Network> m_network;
 
 	/** the @a NetMessage @a Queue. */
 	Queue<NetMessage*> m_netQueue;

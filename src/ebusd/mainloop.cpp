@@ -64,7 +64,7 @@ MainLoop::MainLoop(const struct options opt, Device *device, MessageMap* message
 	} else {
 		latency = (unsigned int)opt.latency;
 	}
-	m_busHandler = new BusHandler(m_device, m_messages,
+	m_busHandler = std::make_unique<BusHandler>(m_device.get(), m_messages,
 			m_address, opt.answer,
 			opt.acquireRetries, opt.sendRetries,
 			latency, opt.acquireTimeout, opt.receiveTimeout,
@@ -74,24 +74,8 @@ MainLoop::MainLoop(const struct options opt, Device *device, MessageMap* message
 
 	// create network
 	m_htmlPath = opt.htmlPath;
-	m_network = new Network(opt.localOnly, opt.port, opt.httpPort, &m_netQueue);
+	m_network = std::make_unique<Network>(opt.localOnly, opt.port, opt.httpPort, &m_netQueue);
 	m_network->start("network");
-}
-
-MainLoop::~MainLoop()
-{
-	if (m_network != NULL) {
-		delete m_network;
-		m_network = NULL;
-	}
-	if (m_busHandler != NULL) {
-		delete m_busHandler;
-		m_busHandler = NULL;
-	}
-	if (m_device != NULL) {
-		delete m_device;
-		m_device = NULL;
-	}
 }
 
 void MainLoop::run()
