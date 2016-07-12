@@ -61,9 +61,9 @@ Message::Message(const string& circuit, const string& name,
 		  m_usedByCondition(false), m_condition(condition),
 		  m_lastUpdateTime(0), m_lastChangeTime(0), m_pollCount(0), m_lastPollTime(0)
 {
-	unsigned long long key = (unsigned long long)(id.size()-2) << (8 * 7 + 5);
+	auto key = static_cast<unsigned long long>(id.size()-2) << (8 * 7 + 5);
 	if (isPassive)
-		key |= (unsigned long long)getMasterNumber(srcAddress) << (8 * 7); // 0..25
+		key |= static_cast<unsigned long long>(getMasterNumber(srcAddress)) << (8 * 7); // 0..25
 	else
 		key |= (isWrite ? 0x1fLL : 0x1eLL) << (8 * 7); // special values for active
 	key |= (unsigned long long)dstAddress << (8 * 6);
