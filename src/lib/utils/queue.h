@@ -23,10 +23,10 @@
 #include <pthread.h>
 #include <errno.h>
 #include "clock.h"
+#include "cppconfig.h"
 
 /** \file queue.h */
 
-using namespace std;
 
 /**
  * Thread safe template class for queuing items.

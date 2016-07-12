@@ -37,7 +37,7 @@
 #include <poll.h>
 #endif
 
-using namespace std;
+using std::ios;
 
 Device::~Device()
 {

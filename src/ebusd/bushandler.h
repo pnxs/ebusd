@@ -39,7 +39,6 @@
  * @image html states.png "ebusd BusHandler states"
  */
 
-using namespace std;
 
 /** the default time [us] for retrieving a symbol from an addressed slave. */
 #define SLAVE_RECV_TIMEOUT 15000

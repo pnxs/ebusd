@@ -31,7 +31,7 @@
 #include <time.h>
 #include <iomanip>
 
-using namespace std;
+using std::dec;
 
 // the string used for answering to a scan request (07h 04h)
 #define SCAN_ANSWER ("ebusd.eu;" PACKAGE_NAME ";" SCAN_VERSION ";100")

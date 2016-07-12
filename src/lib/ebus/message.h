@@ -54,8 +54,6 @@
  * template class.
  */
 
-using namespace std;
-
 class Condition;
 class SimpleCondition;
 class CombinedCondition;

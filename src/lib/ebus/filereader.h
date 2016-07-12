@@ -21,6 +21,7 @@
 
 #include "symbol.h"
 #include "result.h"
+#include "cppconfig.h"
 #include <climits>
 #include <string>
 #include <iostream>
@@ -39,7 +40,7 @@
  * with a "*" symbol.
  */
 
-using namespace std;
+//using namespace std;
 
 /** the separator character used between fields. */
 #define FIELD_SEPARATOR ','

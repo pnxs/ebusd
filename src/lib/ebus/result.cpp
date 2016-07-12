@@ -19,7 +19,6 @@
 #include "result.h"
 #include <iostream>
 
-using namespace std;
 
 const char* getResultCode(result_t resultCode) {
 	switch (resultCode) {

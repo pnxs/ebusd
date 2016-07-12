@@ -23,10 +23,9 @@
 #include <sys/socket.h>
 #include <string>
 #include <stdint.h>
+#include "cppconfig.h"
 
 /** \file tcpsocket.h */
-
-using namespace std;
 
 #ifdef __MACH__
 #ifndef MSG_NOSIGNAL

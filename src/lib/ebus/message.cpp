@@ -27,7 +27,7 @@
 #include <iomanip>
 #include <climits>
 
-using namespace std;
+using std::dec;
 
 /** the maximum length of the command ID bytes (in addition to PB/SB) for which the key is distinct. */
 #define MAX_ID_KEYLEN 4

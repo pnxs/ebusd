@@ -25,7 +25,7 @@
 
 /** \file mainloop.h */
 
-using namespace std;
+//using namespace std;
 
 /**
  * The main loop handling requests from connected clients.

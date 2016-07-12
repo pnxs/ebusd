@@ -20,6 +20,7 @@
 #define LIBEBUS_SYMBOL_H_
 
 #include "result.h"
+#include "cppconfig.h"
 #include <cstring>
 #include <cstdlib>
 #include <sstream>
@@ -60,8 +61,6 @@
  * correct reception of the response as described above and in case of a
  * non-acknowledge, the receiving slave has to repeat its data once.
  */
-
-using namespace std;
 
 static const unsigned char ESC = 0xA9;       //!< escape symbol, either followed by 0x00 for the value 0xA9, or 0x01 for the value 0xAA
 static const unsigned char SYN = 0xAA;       //!< synchronization symbol

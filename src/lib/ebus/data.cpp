@@ -28,7 +28,9 @@
 #include <cstring>
 #include <math.h>
 
-using namespace std;
+using std::dec;
+using std::setprecision;
+using std::fixed;
 
 static const dataType_t stringDataType = {
 	"STR",MAX_LEN*8,bt_str, ADJ,        ' ',          1,          0,    0  // >= 1 byte character string filled up with space

@@ -23,8 +23,6 @@
 #include <netdb.h>
 #include <string.h>
 
-using namespace std;
-
 TCPSocket::TCPSocket(int sfd, struct sockaddr_in* address) : m_sfd(sfd)
 {
 	char ip[17];

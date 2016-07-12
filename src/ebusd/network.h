@@ -29,8 +29,6 @@
 
 /** \file network.h */
 
-using namespace std;
-
 /** Forward declaration for @a Connection. */
 class Connection;
 

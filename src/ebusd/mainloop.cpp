@@ -23,7 +23,7 @@
 #include "data.h"
 #include "config.h"
 
-using namespace std;
+using std::dec;
 
 /** the known column names (pairs of full length name and short length name). */
 static const char* columnNames[] = {

@@ -28,8 +28,6 @@
 #include <poll.h>
 #endif
 
-using namespace std;
-
 int Connection::m_ids = 0;
 
 void Connection::run()

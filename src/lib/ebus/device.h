@@ -26,6 +26,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include "result.h"
+#include "cppconfig.h"
 
 /** @file device.h
  * Classes providing access to the eBUS.
@@ -35,8 +36,6 @@
  * send and receive bytes to/from the eBUS while optionally dumping the data
  * to a file and/or forwarding it to a logging function.
  */
-
-using namespace std;
 
 /**
  * The base class for accessing an eBUS.
