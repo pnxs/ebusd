@@ -1,6 +1,4 @@
 
-include_directories(${CMAKE_SOURCE_DIR}/src/lib/ebus)
-
 set(SOURCES bushandler.cpp
 bushandler.h
 network.cpp
