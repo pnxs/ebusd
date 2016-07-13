@@ -204,11 +204,11 @@ public:
 	 * @return @a RESULT_OK on success, or an error code.
 	 * Note: the caller needs to free the created instance.
 	 */
-	static result_t create(vector<string>::iterator& it, const vector<string>::iterator end,
-			DataFieldTemplates* templates, DataField*& returnField,
-			const bool isWriteMessage,
-			const bool isTemplate, const bool isBroadcastOrMasterDestination,
-			const unsigned char maxFieldLength=MAX_POS);
+	static result_t create(vector<string>::iterator &it, const vector<string>::iterator end,
+						   DataFieldTemplates *templates, shared_ptr<DataField> &returnField,
+						   const bool isWriteMessage,
+						   const bool isTemplate, const bool isBroadcastOrMasterDestination,
+						   const unsigned char maxFieldLength = MAX_POS);
 
 	/**
 	 * Dump the @a string optionally embedded in @a TEXT_SEPARATOR to the output.
@@ -238,9 +238,9 @@ public:
 	 * @return @a RESULT_OK on success, or an error code.
 	 */
 	virtual result_t derive(string name, string comment,
-			string unit, const PartType partType,
-			int divisor, map<unsigned int, string> values,
-			vector<SingleDataField*>& fields) = 0;
+							string unit, const PartType partType,
+							int divisor, map<unsigned int, string> values,
+							vector<shared_ptr<SingleDataField>> &fields) = 0;
 
 	/**
 	 * Get the field name.
@@ -375,10 +375,10 @@ public:
 	 * @return @a RESULT_OK on success, or an error code.
 	 * Note: the caller needs to free the created instance.
 	 */
-	static result_t create(const char* typeNameStr, const unsigned char length,
-		const string name, const string comment, const string unit,
-		const PartType partType, int divisor, map<unsigned int, string> values,
-		SingleDataField* &returnField);
+	static result_t create(const char *typeNameStr, const unsigned char length,
+						   const string name, const string comment, const string unit,
+						   const PartType partType, int divisor, map<unsigned int, string> values,
+						   shared_ptr<SingleDataField> &returnField);
 
 	/**
 	 * Get the value unit.
@@ -514,9 +514,9 @@ public:
 
 	// @copydoc
 	virtual result_t derive(string name, string comment,
-			string unit, const PartType partType,
-			int divisor, map<unsigned int, string> values,
-			vector<SingleDataField*>& fields);
+							string unit, const PartType partType,
+							int divisor, map<unsigned int, string> values,
+							vector<shared_ptr<SingleDataField>> &fields);
 
 	// @copydoc
 	virtual bool hasField(const char* fieldName, bool numeric);
@@ -637,9 +637,9 @@ public:
 
 	// @copydoc
 	virtual result_t derive(string name, string comment,
-			string unit, const PartType partType,
-			int divisor, map<unsigned int, string> values,
-			vector<SingleDataField*>& fields);
+							string unit, const PartType partType,
+							int divisor, map<unsigned int, string> values,
+							vector<shared_ptr<SingleDataField>> &fields);
 
 	// @copydoc
 	virtual void dump(ostream& output);
@@ -700,9 +700,9 @@ public:
 
 	// @copydoc
 	virtual result_t derive(string name, string comment,
-			string unit, const PartType partType, int divisor,
-			map<unsigned int, string> values,
-			vector<SingleDataField*>& fields);
+							string unit, const PartType partType, int divisor,
+							map<unsigned int, string> values,
+							vector<shared_ptr<SingleDataField>> &fields);
 
 	// @copydoc
 	virtual void dump(ostream& output);
@@ -741,7 +741,7 @@ public:
 	 * </ul>
 	 * Note: the returned value may only be deleted once.
 	 */
-	static DataFieldSet* getIdentFields();
+	static shared_ptr<DataFieldSet> getIdentFields();
 
 	/**
 	 * Constructs a new instance.
@@ -750,14 +750,14 @@ public:
 	 * @param fields the @a vector of @a SingleDataField instances part of this set.
 	 */
 	DataFieldSet(const string name, const string comment,
-			const vector<SingleDataField*> fields)
+				 const vector<shared_ptr<SingleDataField>> fields)
 		: DataField(name, comment),
 		  m_fields(fields)
 	{
 		bool uniqueNames = true;
 		map<string, string> names;
-		for (vector<SingleDataField*>::const_iterator it=fields.begin(); it!=fields.end(); it++) {
-			SingleDataField* field = *it;
+		for (auto it=fields.begin(); it!=fields.end(); it++) {
+			auto field = *it;
 			if (field->isIgnored()) continue;
 			string name = field->getName();
 			if (name.empty() || names.find(name)!=names.end()) {
@@ -782,23 +782,23 @@ public:
 
 	// @copydoc
 	virtual result_t derive(string name, string comment,
-			string unit, const PartType partType,
-			int divisor, map<unsigned int, string> values,
-			vector<SingleDataField*>& fields);
+							string unit, const PartType partType,
+							int divisor, map<unsigned int, string> values,
+							vector<shared_ptr<SingleDataField>> &fields);
 
 	/**
 	 * Returns the @a SingleDataField at the specified index.
 	 * @param index the index of the @a SingleDataField to return.
 	 * @return the @a SingleDataField at the specified index, or NULL.
 	 */
-	SingleDataField* operator[](const size_t index) { if (index >= m_fields.size()) return NULL; return m_fields[index]; }
+	SingleDataField* operator[](const size_t index) { if (index >= m_fields.size()) return NULL; return m_fields[index].get(); }
 
 	/**
 	 * Returns the @a SingleDataField at the specified index.
 	 * @param index the index of the @a SingleDataField to return.
 	 * @return the @a SingleDataField at the specified index, or NULL.
 	 */
-	const SingleDataField* operator[](const size_t index) const { if (index >= m_fields.size()) return NULL; return m_fields[index]; }
+	const SingleDataField* operator[](const size_t index) const { if (index >= m_fields.size()) return NULL; return m_fields[index].get(); }
 
 	/**
 	 * Returns the number of @a SingleDataFields instances in this set.
@@ -831,10 +831,10 @@ public:
 private:
 
 	/** the @a DataFieldSet containing the ident message @a SingleDataField instances, or NULL. */
-	static DataFieldSet* s_identFields;
+	static shared_ptr<DataFieldSet> s_identFields;
 
 	/** the @a vector of @a SingleDataField instances part of this set. */
-	vector<SingleDataField*> m_fields;
+	vector<shared_ptr<SingleDataField>> m_fields;
 
 	/** whether all fields have a unique name. */
 	bool m_uniqueNames;
@@ -880,7 +880,7 @@ public:
 	 * @return @a RESULT_OK on success, or an error code.
 	 * Note: the caller may not free the added instance on success.
 	 */
-	result_t add(DataField* field, string name="", bool replace=false);
+	result_t add(shared_ptr<DataField> field, string name="", bool replace=false);
 
 	// @copydoc
 	virtual result_t addFromFile(vector<string>::iterator& begin, const vector<string>::iterator end,
@@ -893,12 +893,12 @@ public:
 	 * @return the template @a DataField instance, or NULL.
 	 * Note: the caller may not free the returned instance.
 	 */
-	DataField* get(string name);
+	shared_ptr<DataField> get(const string &name);
 
 private:
 
 	/** the known template @a DataField instances by name. */
-	map<string, DataField*> m_fieldsByName;
+	map<string, shared_ptr<DataField>> m_fieldsByName;
 
 };
 

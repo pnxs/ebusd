@@ -151,7 +151,7 @@ public:
 	 * Constructor.
 	 * @param message the associated @a Message.
 	 */
-	PollRequest(Message* message)
+	PollRequest(shared_ptr<Message> message)
 		: BusRequest(m_master, true), m_message(message), m_index(0) {}
 
 	/**
@@ -175,7 +175,7 @@ private:
 	SymbolString m_master;
 
 	/** the associated @a Message. */
-	Message* m_message;
+	shared_ptr<Message> m_message;
 
 	/** the current part index in @a m_message. */
 	unsigned char m_index;
@@ -198,7 +198,7 @@ public:
 	 * @param slaves the slave addresses to scan.
 	 * @param busHandler the @a BusHandler instance to notify of final scan result.
 	 */
-	ScanRequest(MessageMap* messageMap, deque<Message*> messages, deque<unsigned char> slaves, BusHandler* busHandler)
+	ScanRequest(MessageMap* messageMap, deque<shared_ptr<Message>> messages, deque<unsigned char> slaves, BusHandler* busHandler)
 		: BusRequest(m_master, true), m_messageMap(messageMap), m_index(0), m_allMessages(messages), m_messages(messages), m_slaves(slaves), m_busHandler(busHandler)
 	{
 		m_message = m_messages.front();
@@ -229,16 +229,16 @@ private:
 	SymbolString m_master;
 
 	/** the currently queried @a Message. */
-	Message* m_message;
+	shared_ptr<Message> m_message;
 
 	/** the current part index in @a m_message. */
 	unsigned char m_index;
 
 	/** all secondary @a Message instances. */
-	const deque<Message*> m_allMessages;
+	const deque<shared_ptr<Message>> m_allMessages;
 
 	/** the remaining secondary @a Message instances. */
-	deque<Message*> m_messages;
+	deque<shared_ptr<Message>> m_messages;
 
 	/** the slave addresses to scan. */
 	deque<unsigned char> m_slaves;

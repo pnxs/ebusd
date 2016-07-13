@@ -157,7 +157,7 @@ public:
 	 * accept an incoming tcp connection and create a local tcp socket for communication.
 	 * @return pointer to an opened tcp socket.
 	 */
-	TCPSocket* newSocket();
+	shared_ptr<TCPSocket> newSocket();
 
 	/**
 	 * returns the file descriptor.

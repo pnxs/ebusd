@@ -110,7 +110,7 @@ int TCPServer::start()
 	return result;
 }
 
-TCPSocket* TCPServer::newSocket()
+shared_ptr<TCPSocket> TCPServer::newSocket()
 {
 	if (!m_listening)
 		return NULL;
@@ -124,6 +124,6 @@ TCPSocket* TCPServer::newSocket()
 	if (sfd < 0)
 		return NULL;
 
-	return new TCPSocket(sfd, &address);
+	return shared_ptr<TCPSocket>(new TCPSocket(sfd, &address));
 }
 

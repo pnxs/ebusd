@@ -40,13 +40,13 @@ void verify(bool expectFailMatch, string type, string input,
 		        << gotStr << "<, expected >" << expectStr << "<" << endl;
 }
 
-DataFieldTemplates* templates = NULL;
+std::unique_ptr<DataFieldTemplates> templates;
 
 DataFieldTemplates* getTemplates(const string filename)
 {
 	if (filename=="") // avoid compiler warning
-		return templates;
-	return templates;
+		return templates.get();
+	return templates.get();
 }
 
 int main()
@@ -112,18 +112,18 @@ int main()
 		{"w,ehp,multi,,,,,01:8;02:2;0304,longname,,STR:15", "ABCDEFGHIJKLMNO", "ff08b5090a0e014142434445464748;ff08b509040e02494a;ff08b509070e034b4c4d4e4f", "00;00;00", "cC" },
 		{"r,ehp,scan,chained scan,,08,B509,24:9;25;26;27,,,IGN,,,,id4,,STR:28", "21074500100027790000000000N8", "ff08b5090124;ff08b5090125;ff08b5090126;ff08b5090127", "09003231303734353030;09313030303237373930;09303030303030303030;024E38", "mdC" },
 	};
-	templates = new DataFieldTemplates();
-	MessageMap* messages = new MessageMap();
+	templates = std::make_unique<DataFieldTemplates>();
+	auto messages = std::make_unique<MessageMap>();
 	vector< vector<string> > defaultsRows;
 	map<string, Condition*> &conditions = messages->getConditions();
-	Message* message = NULL;
-	vector<Message*> deleteMessages;
-	vector<SymbolString*> mstrs;
-	vector<SymbolString*> sstrs;
+	shared_ptr<Message> message = NULL;
+	vector<shared_ptr<Message>> deleteMessages;
+	vector<std::unique_ptr<SymbolString>> mstrs;
+	vector<std::unique_ptr<SymbolString>> sstrs;
 	mstrs.resize(1);
 	sstrs.resize(1);
 	for (size_t i = 0; i < sizeof(checks) / sizeof(checks[0]); i++) {
-		string check[5] = checks[i];
+		auto check = checks[i];
 		string inputStr = check[1];
 		string flags = check[4];
 		bool isTemplate = flags == "template";
@@ -148,9 +148,8 @@ int main()
 			while (getline(stream, token, VALUE_SEPARATOR)) {
 				if (pos >= mstrs.size())
 					mstrs.resize(pos+1);
-				else if (mstrs[pos]!=NULL)
-					delete mstrs[pos];
-				mstrs[pos] = new SymbolString(false);
+
+				mstrs[pos] = std::make_unique<SymbolString>(false);
 				result = mstrs[pos]->parseHex(token);
 				if (result != RESULT_OK) {
 					cout << "\"" << check[0] << "\": parse \"" << token << "\" error: " << getResultCode(result) << endl;
@@ -164,9 +163,7 @@ int main()
 			while (getline(stream, token, VALUE_SEPARATOR)) {
 				if (pos >= sstrs.size())
 					sstrs.resize(pos+1);
-				else if (sstrs[pos]!=NULL)
-					delete sstrs[pos];
-				sstrs[pos] = new SymbolString(false);
+				sstrs[pos] = std::make_unique<SymbolString>(false);
 				result = sstrs[pos]->parseHex(token);
 				if (result != RESULT_OK) {
 					cout << "\"" << check[0] << "\": parse \"" << token << "\" error: " << getResultCode(result) << endl;
@@ -177,17 +174,13 @@ int main()
 			if (result != RESULT_OK)
 				continue;
 		} else {
-			if (mstrs[0]!=NULL)
-				delete mstrs[0];
-			mstrs[0] = new SymbolString(true);
+			mstrs[0] = std::make_unique<SymbolString>(true);
 			result = mstrs[0]->parseHex(check[2]);
 			if (result != RESULT_OK) {
 				cout << "\"" << check[0] << "\": parse \"" << check[2] << "\" error: " << getResultCode(result) << endl;
 				continue;
 			}
-			if (sstrs[0]!=NULL)
-				delete sstrs[0];
-			sstrs[0] = new SymbolString(true);
+			sstrs[0] = std::make_unique<SymbolString>(true);
 			result = sstrs[0]->parseHex(check[3]);
 			if (result != RESULT_OK) {
 				cout << "\"" << check[0] << "\": parse \"" << check[3] << "\" error: " << getResultCode(result) << endl;
@@ -201,18 +194,13 @@ int main()
 			entries.clear();
 		}
 
-		if (deleteMessages.size()>0) {
-			for (vector<Message*>::iterator it = deleteMessages.begin(); it != deleteMessages.end(); it++) {
-				Message* deleteMessage = *it;
-				delete deleteMessage;
-			}
-			deleteMessages.clear();
-		}
+        deleteMessages.clear();
+
 		if (isTemplate) {
 			// store new template
-			DataField* fields = NULL;
-			vector<string>::iterator it = entries.begin();
-			result = DataField::create(it, entries.end(), templates, fields, false, true, false);
+			shared_ptr<DataField> fields;
+			auto it = entries.begin();
+			result = DataField::create(it, entries.end(), templates.get(), fields, false, true, false);
 			if (result != RESULT_OK)
 				cout << "\"" << check[0] << "\": template fields create error: " << getResultCode(result) << endl;
 			else if (it != entries.end()) {
@@ -225,7 +213,6 @@ int main()
 					cout << "  store template OK" << endl;
 				else {
 					cout << "  store template error: " << getResultCode(result) << endl;
-					delete fields;
 				}
 			}
 			continue;
@@ -264,13 +251,13 @@ int main()
 			cout << "\"" << check[2] << "\": find OK" << endl;
 		}
 		else {
-			vector<string>::iterator it = entries.begin();
+			auto it = entries.begin();
 			string types = *it;
 			Condition* condition = NULL;
 			result = messages->readConditions(types, "no file", condition);
 			if (result==RESULT_OK) {
 				*it = types;
-				result = Message::create(it, entries.end(), &defaultsRows, condition, "no file", templates, deleteMessages);
+				result = Message::create(it, entries.end(), &defaultsRows, condition, "no file", templates.get(), deleteMessages);
 			}
 			if (failedCreate) {
 				if (result == RESULT_OK)
@@ -304,8 +291,8 @@ int main()
 			cout << "\"" << check[0] << "\": create OK" << endl;
 			if (!dontMap) {
 				result_t result = RESULT_OK;
-				for (vector<Message*>::iterator it = deleteMessages.begin(); it != deleteMessages.end(); it++) {
-					Message* deleteMessage = *it;
+				for (auto msgToDelete : deleteMessages) {
+					auto deleteMessage = msgToDelete;
 					result_t result = messages->add(deleteMessage);
 					if (result != RESULT_OK) {
 						cout << "\"" << check[0] << "\": add error: "
@@ -320,7 +307,7 @@ int main()
 				deleteMessages.clear();
 				if (onlyMap)
 					continue;
-				Message* foundMessage = messages->find(*mstrs[0]);
+				auto foundMessage = messages->find(*mstrs[0]);
 				if (foundMessage == message)
 					cout << "  find OK" << endl;
 				else if (foundMessage == NULL)
@@ -371,22 +358,8 @@ int main()
 		}
 	}
 
-	if (deleteMessages.size()>0) {
-		for (vector<Message*>::iterator it = deleteMessages.begin(); it != deleteMessages.end(); it++) {
-			Message* deleteMessage = *it;
-			delete deleteMessage;
-		}
-		deleteMessages.clear();
-	}
+	deleteMessages.clear();
 
-	delete templates;
-	delete messages;
-	for (vector<SymbolString*>::iterator it = mstrs.begin(); it!=mstrs.end(); it++) {
-		delete *it;
-	}
-	for (vector<SymbolString*>::iterator it = sstrs.begin(); it!=sstrs.end(); it++) {
-		delete *it;
-	}
 	return 0;
 
 }

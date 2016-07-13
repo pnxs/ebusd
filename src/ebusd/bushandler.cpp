@@ -110,7 +110,7 @@ bool ScanRequest::notify(result_t result, SymbolString& slave)
 	unsigned char dstAddress = m_master[1];
 	if (result == RESULT_OK) {
 		if (m_message==m_messageMap->getScanMessage()) {
-			Message* message = m_messageMap->getScanMessage(dstAddress);
+			auto message = m_messageMap->getScanMessage(dstAddress);
 			if (message!=NULL) {
 				m_message = message;
 				m_message->storeLastData(pt_masterData, m_master, m_index); // expected to work since this is a clone
@@ -195,7 +195,7 @@ result_t BusHandler::sendAndWait(SymbolString& master, SymbolString& slave)
 		result = success ? request.m_result : RESULT_ERR_TIMEOUT;
 
 		if (result == RESULT_OK) {
-			Message* message = m_messages->find(master);
+			auto message = m_messages->find(master);
 			if (message != NULL)
 				m_messages->invalidateCache(message);
 			break;
@@ -277,7 +277,7 @@ result_t BusHandler::handleSymbol()
 				time_t now;
 				time(&now);
 				if (m_lastPoll == 0 || difftime(now, m_lastPoll) > m_pollInterval) {
-					Message* message = m_messages->getNextPoll();
+					auto message = m_messages->getNextPoll();
 					if (message != NULL) {
 						m_lastPoll = now;
 						PollRequest* request = new PollRequest(message);
@@ -623,9 +623,8 @@ result_t BusHandler::handleSymbol()
 
 			m_nextSendPos = 0;
 			m_repeat = false;
-			Message* message;
 			istringstream input; // TODO create input from database of internal variables
-			message = m_messages->find(m_command);
+			auto message = m_messages->find(m_command);
 			if (message == NULL) {
 				message = m_messages->find(m_command, true);
 				if (message!=NULL && message->getSrcAddress()!=SYN)
@@ -780,7 +779,7 @@ void BusHandler::receiveCompleted()
 	else
 		logInfo(lf_update, "update MS cmd: %s / %s", m_command.getDataStr().c_str(), m_response.getDataStr().c_str());
 
-	Message* message = m_messages->find(m_command);
+	auto message = m_messages->find(m_command);
 	if (m_grabUnknownMessages==gr_all || (message==NULL && m_grabUnknownMessages==gr_unknown)) {
 		string data;
 		string key = data = m_command.getDataStr();
@@ -834,14 +833,14 @@ void BusHandler::receiveCompleted()
 
 result_t BusHandler::startScan(bool full)
 {
-	deque<Message*> messages = m_messages->findAll("scan", "");
-	for (deque<Message*>::iterator it = messages.begin(); it < messages.end(); it++) {
-		Message* message = *it;
+	auto messages = m_messages->findAll("scan", "");
+	for (auto it = messages.begin(); it < messages.end(); it++) {
+		auto message = *it;
 		if (message->getPrimaryCommand() == 0x07 && message->getSecondaryCommand() == 0x04)
 			messages.erase(it--); // query pb 0x07 / sb 0x04 only once
 	}
 
-	Message* scanMessage = m_messages->getScanMessage();
+	auto scanMessage = m_messages->getScanMessage();
 	if (scanMessage==NULL)
 		return RESULT_ERR_NOTFOUND;
 
@@ -906,7 +905,7 @@ void BusHandler::formatScanResult(ostringstream& output)
 		// fallback to autoscan results
 		for (unsigned char slave = 1; slave != 0; slave++) { // 0 is known to be a master
 			if (isValidAddress(slave, false) && !isMaster(slave) && (m_seenAddresses[slave]&SCAN_DONE)!=0) {
-				Message* message = m_messages->getScanMessage(slave);
+				auto message = m_messages->getScanMessage(slave);
 				if (message!=NULL && message->getLastUpdateTime()>0) {
 					if (first)
 						first = false;
@@ -948,7 +947,7 @@ void BusHandler::formatSeenInfo(ostringstream& output)
 			}
 			if ((m_seenAddresses[address]&SCAN_DONE)!=0) {
 				output << ", scanned";
-				Message* message = m_messages->getScanMessage(address);
+				auto message = m_messages->getScanMessage(address);
 				if (message!=NULL && message->getLastUpdateTime()>0) {
 					// add detailed scan info: Manufacturer ID SW HW
 					output << " \"";
@@ -971,7 +970,7 @@ result_t BusHandler::scanAndWait(unsigned char dstAddress, SymbolString& slave)
 	if (!isValidAddress(dstAddress, false) || isMaster(dstAddress))
 		return RESULT_ERR_INVALID_ADDR;
 	m_seenAddresses[dstAddress] |= SCAN_INIT;
-	Message* scanMessage = m_messages->getScanMessage();
+	auto scanMessage = m_messages->getScanMessage();
 	if (scanMessage==NULL) {
 		return RESULT_ERR_NOTFOUND;
 	}
@@ -981,7 +980,7 @@ result_t BusHandler::scanAndWait(unsigned char dstAddress, SymbolString& slave)
 	if (result==RESULT_OK) {
 		result = sendAndWait(master, slave);
 		if (result==RESULT_OK) {
-			Message* message = m_messages->getScanMessage(dstAddress);
+			auto message = m_messages->getScanMessage(dstAddress);
 			if (message!=NULL && message!=scanMessage) {
 				scanMessage = message;
 				scanMessage->storeLastData(pt_masterData, master, 0); // update the cache, expected to work since this is a clone

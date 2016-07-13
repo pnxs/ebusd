@@ -212,11 +212,15 @@ public:
 	 * @param isHttp whether this is a HTTP message.
 	 * @param netQueue the reference to the @a NetMessage @a Queue.
 	 */
-	Connection(TCPSocket* socket, const bool isHttp, Queue<NetMessage*>* netQueue)
+	Connection(shared_ptr<TCPSocket> socket, const bool isHttp, Queue<NetMessage*>& netQueue)
 		: m_isHttp(isHttp), m_socket(socket), m_netQueue(netQueue)
 		{ m_id = ++m_ids; }
 
-	virtual ~Connection() { if (m_socket) delete m_socket; }
+	virtual ~Connection()
+    {
+        stop();
+        join();
+    }
 	/**
 	 * endless loop for connection instance.
 	 */
@@ -238,10 +242,10 @@ private:
 	const bool m_isHttp;
 
 	/** the @a TCPSocket for communication. */
-	TCPSocket* m_socket;
+	std::shared_ptr<TCPSocket> m_socket;
 
 	/** the reference to the @a NetMessage @a Queue. */
-	Queue<NetMessage*>* m_netQueue;
+	Queue<NetMessage*>& m_netQueue;
 
 	/** notification object for shutdown procedure. */
 	Notify m_notify;
@@ -268,7 +272,7 @@ public:
 	 * @param httpPort the port to listen for HTTP connections, or 0.
 	 * @param netQueue the reference to the @a NetMessage @a Queue.
 	 */
-	Network(const bool local, const uint16_t port, const uint16_t httpPort, Queue<NetMessage*>* netQueue);
+	Network(const bool local, const uint16_t port, const uint16_t httpPort, Queue<NetMessage*>& netQueue);
 
 	/**
 	 * destructor.
@@ -287,16 +291,16 @@ public:
 
 private:
 	/** the list of active @a Connection instances. */
-	list<Connection*> m_connections;
+	list<shared_ptr<Connection>> m_connections;
 
 	/** the reference to the @a NetMessage @a Queue. */
-	Queue<NetMessage*>* m_netQueue;
+	Queue<NetMessage*>& m_netQueue;
 
 	/** the command line @a TCPServer instance. */
-	TCPServer* m_tcpServer;
+	std::unique_ptr<TCPServer> m_tcpServer;
 
 	/** the HTTP @a TCPServer instance, or NULL. */
-	TCPServer* m_httpServer;
+	std::unique_ptr<TCPServer> m_httpServer;
 
 	/** @a Notify object for shutdown procedure. */
 	Notify m_notify;

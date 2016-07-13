@@ -111,7 +111,7 @@ private:
 	 * @param dstAddress the destination address to set, or @a SYN to keep the address defined during construction.
 	 * @return the result code.
 	 */
-	result_t readFromBus(Message* message, string inputStr, const unsigned char dstAddress=SYN);
+	result_t readFromBus(shared_ptr<Message> message, string inputStr, const unsigned char dstAddress=SYN);
 
 	/**
 	 * Execute the read command.

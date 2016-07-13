@@ -87,7 +87,7 @@ public:
 			const bool isWrite, const bool isPassive, const string comment,
 			const unsigned char srcAddress, const unsigned char dstAddress,
 			const vector<unsigned char> id,
-			DataField* data, const bool deleteData,
+			shared_ptr<DataField> data, const bool deleteData,
 			const unsigned char pollPriority,
 			Condition* condition=NULL);
 
@@ -106,12 +106,12 @@ public:
 	Message(const string& circuit, const string& name,
 			const bool isWrite, const bool isPassive,
 			const unsigned char pb, const unsigned char sb,
-			DataField* data, const bool deleteData);
+			shared_ptr<DataField> data, const bool deleteData);
 
 	/**
 	 * Destructor.
 	 */
-	virtual ~Message() { if (m_deleteData) delete m_data; }
+	virtual ~Message() { }
 
 	/**
 	 * Parse an ID part from the input @a string.
@@ -135,7 +135,7 @@ public:
 	 */
 	static result_t create(vector<string>::iterator& it, const vector<string>::iterator end,
 			vector< vector<string> >* defaultsRows, Condition* condition, const string& filename,
-			DataFieldTemplates* templates, vector<Message*>& messages);
+			DataFieldTemplates* templates, vector<shared_ptr<Message>>& messages);
 
 	/**
 	 * Derive a new @a Message from this message.
@@ -144,7 +144,7 @@ public:
 	 * @param circuit the new circuit name, or empty to use the current circuit name.
 	 * @return the derived @a Message instance.
 	 */
-	virtual Message* derive(const unsigned char dstAddress, const unsigned char srcAddress=SYN, const string circuit="");
+	virtual shared_ptr<Message> derive(const unsigned char dstAddress, const unsigned char srcAddress=SYN, const string circuit="");
 
 	/**
 	 * Derive a new @a Message from this message.
@@ -152,7 +152,7 @@ public:
 	 * @param extendCircuit whether to extend the current circuit name with a dot and the new destination address in hex.
 	 * @return the derived @a Message instance.
 	 */
-	Message* derive(const unsigned char dstAddress, const bool extendCircuit);
+	shared_ptr<Message> derive(const unsigned char dstAddress, const bool extendCircuit);
 
 	/**
 	 * Get the optional circuit name.
@@ -485,7 +485,7 @@ protected:
 	unsigned long long m_key;
 
 	/** the @a DataField for encoding/decoding the message. */
-	DataField* m_data;
+	shared_ptr<DataField> m_data;
 
 	/** whether to delete the @a DataField during destruction. */
 	const bool m_deleteData;
@@ -548,14 +548,14 @@ public:
 			const unsigned char srcAddress, const unsigned char dstAddress,
 			const vector<unsigned char> id,
 			vector< vector<unsigned char> > ids, vector<unsigned char> lengths,
-			DataField* data, const bool deleteData,
+			shared_ptr<DataField> data, const bool deleteData,
 			const unsigned char pollPriority,
 			Condition* condition=NULL);
 
 	virtual ~ChainedMessage();
 
 	// @copydoc
-	virtual Message* derive(const unsigned char dstAddress, const unsigned char srcAddress=SYN, const string circuit="");
+	virtual shared_ptr<Message> derive(const unsigned char dstAddress, const unsigned char srcAddress=SYN, const string circuit="");
 
 	// @copydoc
 	virtual unsigned char getIdLength() const { return (unsigned char)(m_ids[0].size() - 2); }
@@ -616,14 +616,14 @@ private:
 /**
  * A function that compares the weighted poll priority of two @a Message instances.
  */
-struct compareMessagePriority : binary_function <Message*,Message*,bool> {
+struct compareMessagePriority : binary_function <shared_ptr<Message>,shared_ptr<Message>,bool> {
 	/**
 	 * Compare the weighted poll priority of the two @a Message instances.
 	 * @param x the first @a Message.
 	 * @param y the second @a Message.
 	 * @return whether @a x is smaller than @a y with regard to their weighted poll priority.
 	 */
-	bool operator() (Message* x, Message* y) const { return x->isLessPollWeight(y); };
+	bool operator() (shared_ptr<Message> x, shared_ptr<Message> y) const { return x->isLessPollWeight(y.get()); };
 };
 
 
@@ -631,7 +631,7 @@ struct compareMessagePriority : binary_function <Message*,Message*,bool> {
  * Helper class extending @a priority_queue to hold distinct values only.
  */
 class MessagePriorityQueue
-	: public priority_queue<Message*, vector<Message*>, compareMessagePriority>
+	: public priority_queue<shared_ptr<Message>, vector<shared_ptr<Message>>, compareMessagePriority>
 {
 public:
 	/**
@@ -640,13 +640,13 @@ public:
 	 */
 	void push(const value_type& __x)
 	{
-		for (vector<Message*>::iterator it = c.begin(); it != c.end(); it++) {
+		for (auto it = c.begin(); it != c.end(); it++) {
 			if (*it==__x) {
 				c.erase(it);
 				break;
 			}
 		}
-		priority_queue<Message*, vector<Message*>, compareMessagePriority>::push(__x);
+		priority_queue<shared_ptr<Message>, vector<shared_ptr<Message>>, compareMessagePriority>::push(__x);
 	}
 };
 
@@ -808,7 +808,7 @@ private:
 	const bool m_hasValues;
 
 	/** the resolved @a Message instance, or NULL. */
-	Message* m_message;
+	shared_ptr<Message> m_message;
 
 };
 
@@ -1067,7 +1067,7 @@ public:
 	MessageMap(const bool addAll=false) : FileReader::FileReader(true),
 		m_addAll(addAll), m_maxIdLength(0), m_messageCount(0), m_conditionalMessageCount(0), m_passiveMessageCount(0)
 	{
-		m_scanMessage = new Message("scan", "ident", false, false, 0x07, 0x04, DataFieldSet::getIdentFields(), true);
+		m_scanMessage = make_shared<Message>("scan", "ident", false, false, 0x07, 0x04, DataFieldSet::getIdentFields(), true);
 	}
 
 	/**
@@ -1075,7 +1075,6 @@ public:
 	 */
 	virtual ~MessageMap() {
 		clear();
-		delete m_scanMessage;
 	}
 
 	/**
@@ -1085,7 +1084,7 @@ public:
 	 * @return @a RESULT_OK on success, or an error code.
 	 * Note: the caller may not free the added instance on success.
 	 */
-	result_t add(Message* message, bool storeByName=true);
+	result_t add(shared_ptr<Message> message, bool storeByName=true);
 
 	// @copydoc
 	virtual result_t addDefaultFromFile(vector< vector<string> >& defaults, vector<string>& row,
@@ -1111,7 +1110,7 @@ public:
 	 * @param dstAddress the destination address, or @a SYN for the base scan @a Message.
 	 * @return the scan @a Message instance, or NULL if the dstAddress is no slave.
 	 */
-	Message* getScanMessage(const unsigned char dstAddress=SYN);
+	shared_ptr<Message> getScanMessage(const unsigned char dstAddress=SYN);
 
 	/**
 	 * Resolve all @a Condition instances.
@@ -1155,7 +1154,7 @@ public:
 	 * @return the found @a Message instances, or NULL.
 	 * Note: the caller may not free the returned instances.
 	 */
-	vector<Message*>* getByKey(const unsigned long long key);
+	vector<shared_ptr<Message>>* getByKey(const unsigned long long key);
 
 	/**
 	 * Find the @a Message instance for the specified circuit and name.
@@ -1166,7 +1165,7 @@ public:
 	 * @return the @a Message instance, or NULL.
 	 * Note: the caller may not free the returned instance.
 	 */
-	Message* find(const string& circuit, const string& name, const bool isWrite, const bool isPassive=false);
+	shared_ptr<Message> find(const string& circuit, const string& name, const bool isWrite, const bool isPassive=false);
 
 	/**
 	 * Find all active get @a Message instances for the specified circuit and name.
@@ -1179,7 +1178,7 @@ public:
 	 * @return the found @a Message instances.
 	 * Note: the caller may not free the returned instances.
 	 */
-	deque<Message*> findAll(const string& circuit, const string& name, const bool completeMatch=true,
+	deque<shared_ptr<Message>> findAll(const string& circuit, const string& name, const bool completeMatch=true,
 		const bool withRead=true, const bool withWrite=false, const bool withPassive=false);
 
 	/**
@@ -1192,21 +1191,21 @@ public:
 	 * @return the @a Message instance, or NULL.
 	 * Note: the caller may not free the returned instance.
 	 */
-	Message* find(SymbolString& master, bool anyDestination=false,
+	shared_ptr<Message> find(SymbolString& master, bool anyDestination=false,
 		const bool withRead=true, const bool withWrite=true, const bool withPassive=true);
 
 	/**
 	 * Invalidate cached data of the @a Message and all other instances with a matching name key.
 	 * @param message the @a Message to invalidate.
 	 */
-	void invalidateCache(Message* message);
+	void invalidateCache(shared_ptr<Message> message);
 
 	/**
 	 * Add a @a Message to the list of instances to poll.
 	 * @param message the @a Message to poll.
 	 * @param toFront whether to add the @a Message to the very front of the poll queue.
 	 */
-	void addPollMessage(Message* message, bool toFront=false);
+	void addPollMessage(shared_ptr<Message> message, bool toFront=false);
 
 	/**
 	 * Removes all @a Message instances.
@@ -1242,7 +1241,7 @@ public:
 	 * @return the next @a Message to poll, or NULL.
 	 * Note: the caller may not free the returned instance.
 	 */
-	Message* getNextPoll();
+	shared_ptr<Message> getNextPoll();
 
 	/**
 	 * Get the number of stored @a Condition instances.
@@ -1269,7 +1268,7 @@ private:
 	const bool m_addAll;
 
 	/** the @a Message instance used for scanning. */
-	Message* m_scanMessage;
+	shared_ptr<Message> m_scanMessage;
 
 	/** the loaded configuration files by slave address. */
 	map<unsigned char, string> m_loadedFiles;
@@ -1287,10 +1286,10 @@ private:
 	size_t m_passiveMessageCount;
 
 	/** the known @a Message instances by lowercase circuit and name. */
-	map<string, vector<Message*> > m_messagesByName;
+	map<string, vector<shared_ptr<Message>> > m_messagesByName;
 
 	/** the known @a Message instances by key. */
-	map<unsigned long long, vector<Message*> > m_messagesByKey;
+	map<unsigned long long, vector<shared_ptr<Message>> > m_messagesByKey;
 
 	/** the known @a Message instances to poll, by priority. */
 	MessagePriorityQueue m_pollMessages;

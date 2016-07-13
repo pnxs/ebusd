@@ -27,6 +27,7 @@
 #include <vector>
 #include <cstring>
 #include <math.h>
+#include "cppconfig.h"
 
 using std::dec;
 using std::setprecision;
@@ -199,14 +200,14 @@ void printErrorPos(ostream& out, vector<string>::iterator begin, const vector<st
 }
 
 
-result_t DataField::create(vector<string>::iterator& it,
-		const vector<string>::iterator end,
-		DataFieldTemplates* templates, DataField*& returnField,
-		const bool isWriteMessage,
-		const bool isTemplate, const bool isBroadcastOrMasterDestination,
-		const unsigned char maxFieldLength)
+result_t DataField::create(vector<string>::iterator &it,
+						   const vector<string>::iterator end,
+						   DataFieldTemplates *templates, shared_ptr<DataField> &returnField,
+						   const bool isWriteMessage,
+						   const bool isTemplate, const bool isBroadcastOrMasterDestination,
+						   const unsigned char maxFieldLength)
 {
-	vector<SingleDataField*> fields;
+	vector<shared_ptr<SingleDataField>> fields;
 	string firstName, firstComment;
 	result_t result = RESULT_OK;
 	if (it == end)
@@ -328,7 +329,7 @@ result_t DataField::create(vector<string>::iterator& it,
 		istringstream stream(typeStr);
 		while (result == RESULT_OK && getline(stream, token, VALUE_SEPARATOR)) {
 			FileReader::trim(token);
-			DataField* templ = templates->get(token);
+			auto templ = templates->get(token);
 			unsigned char length;
 			if (templ == NULL) {
 				size_t pos = token.find(LENGTH_SEPARATOR);
@@ -342,9 +343,9 @@ result_t DataField::create(vector<string>::iterator& it,
 						break;
 				}
 				string typeName = token.substr(0, pos);
-				SingleDataField* add = NULL;
+				shared_ptr<SingleDataField> add;
 				result = SingleDataField::create(typeName.c_str(), length, firstType ? name : "", firstType ? comment : "", firstType ? unit : "", partType, divisor, values, add);
-				if (add != NULL)
+				if (add)
 					fields.push_back(add);
 				else if (result == RESULT_OK)
 					result = RESULT_ERR_NOTFOUND; // type not found
@@ -359,7 +360,6 @@ result_t DataField::create(vector<string>::iterator& it,
 
 	if (result != RESULT_OK) {
 		while (!fields.empty()) { // cleanup already created fields
-			delete fields.back();
 			fields.pop_back();
 		}
 		return result;
@@ -368,7 +368,7 @@ result_t DataField::create(vector<string>::iterator& it,
 	if (fields.size() == 1)
 		returnField = fields[0];
 	else {
-		returnField = new DataFieldSet(firstName, firstComment, fields);
+		returnField = make_shared<DataFieldSet>(firstName, firstComment, fields);
 	}
 	return RESULT_OK;
 }
@@ -384,10 +384,10 @@ void DataField::dumpString(ostream& output, const string str, const bool prepend
 	}
 }
 
-result_t SingleDataField::create(const char* typeNameStr, const unsigned char length,
-	const string name, const string comment, const string unit,
-	const PartType partType, int divisor, map<unsigned int, string> values,
-	SingleDataField* &returnField)
+result_t SingleDataField::create(const char *typeNameStr, const unsigned char length,
+								 const string name, const string comment, const string unit,
+								 const PartType partType, int divisor, map<unsigned int, string> values,
+								 shared_ptr<SingleDataField> &returnField)
 {
 	for (size_t i = 0; i < sizeof(dataTypes) / sizeof(dataType_t); i++) {
 		const dataType_t* dataType = &dataTypes[i];
@@ -425,7 +425,7 @@ result_t SingleDataField::create(const char* typeNameStr, const unsigned char le
 		case bt_tim:
 			if (divisor != 0 || !values.empty())
 				return RESULT_ERR_INVALID_ARG; // cannot set divisor or values for string field
-			returnField = new StringDataField(name, comment, unit, *dataType, partType, byteCount);
+			returnField = make_shared<StringDataField>(name, comment, unit, *dataType, partType, byteCount);
 			return RESULT_OK;
 		case bt_num:
 			if (values.empty() && (dataType->flags & DAY) != 0) {
@@ -456,7 +456,7 @@ result_t SingleDataField::create(const char* typeNameStr, const unsigned char le
 						return RESULT_ERR_OUT_OF_RANGE;
 				}
 
-				returnField = new NumberDataField(name, comment, unit, *dataType, partType, byteCount, bitCount, divisor);
+				returnField = make_shared<NumberDataField>(name, comment, unit, *dataType, partType, byteCount, bitCount, divisor);
 				return RESULT_OK;
 			}
 			if (values.begin()->first < dataType->minValue || values.rbegin()->first > dataType->maxValue)
@@ -465,7 +465,7 @@ result_t SingleDataField::create(const char* typeNameStr, const unsigned char le
 			if (divisor != 0)
 				return RESULT_ERR_INVALID_ARG; // cannot use divisor != 1 for value list field
 			//TODO add special field for fixed values (exactly one value in the list of values)
-			returnField = new ValueListDataField(name, comment, unit, *dataType, partType, byteCount, bitCount, values);
+			returnField = make_shared<ValueListDataField>(name, comment, unit, *dataType, partType, byteCount, bitCount, values);
 			return RESULT_OK;
 		}
 	}
@@ -604,9 +604,9 @@ StringDataField* StringDataField::clone()
 }
 
 result_t StringDataField::derive(string name, string comment,
-		string unit, const PartType partType,
-		int divisor, map<unsigned int, string> values,
-		vector<SingleDataField*>& fields)
+								 string unit, const PartType partType,
+								 int divisor, map<unsigned int, string> values,
+								 vector<shared_ptr<SingleDataField>> &fields)
 {
 	if (m_partType != pt_any && partType == pt_any)
 		return RESULT_ERR_INVALID_PART; // cannot create a template from a concrete instance
@@ -619,7 +619,7 @@ result_t StringDataField::derive(string name, string comment,
 	if (unit.empty())
 		unit = m_unit;
 
-	fields.push_back(new StringDataField(name, comment, unit, m_dataType, partType, m_length));
+	fields.push_back(make_shared<StringDataField>(name, comment, unit, m_dataType, partType, m_length));
 
 	return RESULT_OK;
 }
@@ -1038,9 +1038,9 @@ NumberDataField* NumberDataField::clone()
 }
 
 result_t NumberDataField::derive(string name, string comment,
-		string unit, const PartType partType,
-		int divisor, map<unsigned int, string> values,
-		vector<SingleDataField*>& fields)
+								 string unit, const PartType partType,
+								 int divisor, map<unsigned int, string> values,
+								 vector<shared_ptr<SingleDataField>> &fields)
 {
 	if (m_partType != pt_any && partType == pt_any)
 		return RESULT_ERR_INVALID_PART; // cannot create a template from a concrete instance
@@ -1054,7 +1054,7 @@ result_t NumberDataField::derive(string name, string comment,
 		if (divisor != 0 || m_divisor != 1)
 			return RESULT_ERR_INVALID_ARG; // cannot use divisor != 1 for value list field
 
-		fields.push_back(new ValueListDataField(name, comment, unit, m_dataType, partType, m_length, m_bitCount, values));
+		fields.push_back(make_shared<ValueListDataField>(name, comment, unit, m_dataType, partType, m_length, m_bitCount, values));
 	}
 	else {
 		if (divisor == 0)
@@ -1079,7 +1079,7 @@ result_t NumberDataField::derive(string name, string comment,
 				return RESULT_ERR_OUT_OF_RANGE;
 			}
 		}
-		fields.push_back(new NumberDataField(name, comment, unit, m_dataType, partType, m_length, m_bitCount, divisor));
+		fields.push_back(make_shared<NumberDataField>(name, comment, unit, m_dataType, partType, m_length, m_bitCount, divisor));
 	}
 	return RESULT_OK;
 }
@@ -1295,9 +1295,9 @@ ValueListDataField* ValueListDataField::clone()
 }
 
 result_t ValueListDataField::derive(string name, string comment,
-		string unit, const PartType partType,
-		int divisor, map<unsigned int, string> values,
-		vector<SingleDataField*>& fields)
+									string unit, const PartType partType,
+									int divisor, map<unsigned int, string> values,
+									vector<shared_ptr<SingleDataField>> &fields)
 {
 	if (m_partType != pt_any && partType == pt_any)
 		return RESULT_ERR_INVALID_PART; // cannot create a template from a concrete instance
@@ -1317,7 +1317,7 @@ result_t ValueListDataField::derive(string name, string comment,
 	else
 		values = m_values;
 
-	fields.push_back(new ValueListDataField(name, comment, unit, m_dataType, partType, m_length, m_bitCount, values));
+	fields.push_back(make_shared<ValueListDataField>(name, comment, unit, m_dataType, partType, m_length, m_bitCount, values));
 
 	return RESULT_OK;
 }
@@ -1393,9 +1393,9 @@ result_t ValueListDataField::writeSymbols(istringstream& input,
 }
 
 
-DataFieldSet* DataFieldSet::s_identFields = NULL;
+shared_ptr<DataFieldSet> DataFieldSet::s_identFields;
 
-DataFieldSet* DataFieldSet::getIdentFields()
+shared_ptr<DataFieldSet> DataFieldSet::getIdentFields()
 {
 	if (s_identFields==NULL) {
 		map<unsigned int, string> manufacturers;
@@ -1424,29 +1424,25 @@ DataFieldSet* DataFieldSet::getIdentFields()
 		manufacturers[0xc0] = "Toby";
 		manufacturers[0xc5] = "Weishaupt";
 		manufacturers[0xfd] = "ebusd.eu";
-		vector<SingleDataField*> fields;
-		fields.push_back(new ValueListDataField("MF", "", "", uchDataType, pt_slaveData, 1, 8, manufacturers));
-		fields.push_back(new StringDataField("ID", "", "", stringDataType, pt_slaveData, 5));
-		fields.push_back(new NumberDataField("SW", "", "", pinDataType, pt_slaveData, 2, 16, 1));
-		fields.push_back(new NumberDataField("HW", "", "", pinDataType, pt_slaveData, 2, 16, 1));
-		s_identFields = new DataFieldSet("ident", "", fields);
+		vector<shared_ptr<SingleDataField>> fields;
+		fields.push_back(make_shared<ValueListDataField>("MF", "", "", uchDataType, pt_slaveData, 1, 8, manufacturers));
+		fields.push_back(make_shared<StringDataField>("ID", "", "", stringDataType, pt_slaveData, 5));
+		fields.push_back(make_shared<NumberDataField>("SW", "", "", pinDataType, pt_slaveData, 2, 16, 1));
+		fields.push_back(make_shared<NumberDataField>("HW", "", "", pinDataType, pt_slaveData, 2, 16, 1));
+		s_identFields = make_shared<DataFieldSet>("ident", "", fields);
 	}
 	return s_identFields;
 }
 
 DataFieldSet::~DataFieldSet()
 {
-	while (!m_fields.empty()) {
-		delete m_fields.back();
-		m_fields.pop_back();
-	}
 }
 
 DataFieldSet* DataFieldSet::clone()
 {
-	vector<SingleDataField*> fields;
-	for (vector<SingleDataField*>::iterator it = m_fields.begin(); it < m_fields.end(); it++) {
-		fields.push_back((*it)->clone());
+	vector<shared_ptr<SingleDataField>> fields;
+	for (auto& field : m_fields) {
+		fields.push_back(shared_ptr<SingleDataField>(field->clone()));
 	}
 	return new DataFieldSet(m_name, m_comment, fields);
 }
@@ -1457,8 +1453,7 @@ unsigned char DataFieldSet::getLength(PartType partType, unsigned char maxLength
 
 	bool previousFullByteOffset[] = { true, true, true, true };
 
-	for (vector<SingleDataField*>::iterator it = m_fields.begin(); it < m_fields.end(); it++) {
-		SingleDataField* field = *it;
+	for (auto& field : m_fields) {
 		if (field->getPartType() == partType) {
 			if (!previousFullByteOffset[partType] && !field->hasFullByteOffset(false))
 				length--;
@@ -1478,14 +1473,14 @@ unsigned char DataFieldSet::getLength(PartType partType, unsigned char maxLength
 }
 
 result_t DataFieldSet::derive(string name, string comment,
-		string unit, const PartType partType,
-		int divisor, map<unsigned int, string> values,
-		vector<SingleDataField*>& fields)
+							  string unit, const PartType partType,
+							  int divisor, map<unsigned int, string> values,
+							  vector<shared_ptr<SingleDataField>> &fields)
 {
 	if (!values.empty())
 		return RESULT_ERR_INVALID_ARG; // value list not allowed in set derive
 	bool first = true;
-	for (vector<SingleDataField*>::iterator it = m_fields.begin(); it < m_fields.end(); it++) {
+	for (auto it = m_fields.begin(); it < m_fields.end(); it++) {
 		result_t result = (*it)->derive("", first?comment:"", first?unit:"", partType, divisor, values, fields);
 		if (result != RESULT_OK)
 			return result;
@@ -1497,8 +1492,7 @@ result_t DataFieldSet::derive(string name, string comment,
 
 bool DataFieldSet::hasField(const char* fieldName, bool numeric)
 {
-	for (vector<SingleDataField*>::iterator it = m_fields.begin(); it < m_fields.end(); it++) {
-		SingleDataField* field = *it;
+	for (auto& field : m_fields) {
 		if (field->hasField(fieldName, numeric)==0)
 			return true;
 	}
@@ -1508,12 +1502,12 @@ bool DataFieldSet::hasField(const char* fieldName, bool numeric)
 void DataFieldSet::dump(ostream& output)
 {
 	bool first = true;
-	for (vector<SingleDataField*>::iterator it = m_fields.begin(); it < m_fields.end(); it++) {
+	for (auto& field : m_fields) {
 		if (first)
 			first = false;
 		else
 			output << FIELD_SEPARATOR;
-		(*it)->dump(output);
+		field->dump(output);
 	}
 }
 
@@ -1522,8 +1516,7 @@ result_t DataFieldSet::read(const PartType partType,
 		unsigned int& output, const char* fieldName, signed char fieldIndex)
 {
 	bool previousFullByteOffset = true, found = false, findFieldIndex = fieldName != NULL && fieldIndex >= 0;
-	for (vector<SingleDataField*>::iterator it = m_fields.begin(); it < m_fields.end(); it++) {
-		SingleDataField* field = *it;
+	for (auto& field : m_fields) {
 		if (partType != pt_any && field->getPartType() != partType)
 			continue;
 
@@ -1565,8 +1558,7 @@ result_t DataFieldSet::read(const PartType partType,
 	bool previousFullByteOffset = true, found = false, findFieldIndex = fieldName != NULL && fieldIndex >= 0;
 	if (!m_uniqueNames && outputIndex<0)
 		outputIndex = 0;
-	for (vector<SingleDataField*>::iterator it = m_fields.begin(); it < m_fields.end(); it++) {
-		SingleDataField* field = *it;
+	for (auto& field : m_fields) {
 		if (partType != pt_any && field->getPartType() != partType) {
 			if (outputIndex>=0 && !field->isIgnored())
 				outputIndex++;
@@ -1619,8 +1611,7 @@ result_t DataFieldSet::write(istringstream& input,
 
 	bool previousFullByteOffset = true;
 	unsigned char baseOffset = offset;
-	for (vector<SingleDataField*>::iterator it = m_fields.begin(); it < m_fields.end(); it++) {
-		SingleDataField* field = *it;
+	for (auto& field : m_fields) {
 		if (partType != pt_any && field->getPartType() != partType)
 			continue;
 
@@ -1636,10 +1627,10 @@ result_t DataFieldSet::write(istringstream& input,
 				token.clear();
 
 			istringstream single(token);
-			result = (*it)->write(single, partType, data, offset, separator, &fieldLength);
+			result = field->write(single, partType, data, offset, separator, &fieldLength);
 		}
 		else
-			result = (*it)->write(input, partType, data, offset, separator, &fieldLength);
+			result = field->write(input, partType, data, offset, separator, &fieldLength);
 
 		if (result != RESULT_OK)
 			return result;
@@ -1657,30 +1648,25 @@ result_t DataFieldSet::write(istringstream& input,
 DataFieldTemplates::DataFieldTemplates(DataFieldTemplates& other)
 	: FileReader::FileReader(false)
 {
-	for (map<string, DataField*>::iterator it = other.m_fieldsByName.begin(); it != other.m_fieldsByName.end(); it++) {
-		m_fieldsByName[it->first] = it->second->clone();
+	for (auto& field : other.m_fieldsByName) {
+		m_fieldsByName[field.first] = shared_ptr<DataField>(field.second->clone());
 	}
 }
 
 void DataFieldTemplates::clear()
 {
-	for (map<string, DataField*>::iterator it = m_fieldsByName.begin(); it != m_fieldsByName.end(); it++) {
-		delete it->second;
-		it->second = NULL;
-	}
 	m_fieldsByName.clear();
 }
 
-result_t DataFieldTemplates::add(DataField* field, string name, bool replace)
+result_t DataFieldTemplates::add(shared_ptr<DataField> field, string name, bool replace)
 {
 	if (name.length() == 0)
 		name = field->getName();
-	map<string, DataField*>::iterator it = m_fieldsByName.find(name);
+	auto it = m_fieldsByName.find(name);
 	if (it != m_fieldsByName.end()) {
 		if (!replace)
 			return RESULT_ERR_DUPLICATE_NAME; // duplicate key
 
-		delete it->second;
 		it->second = field;
 
 		return RESULT_OK;
@@ -1695,8 +1681,8 @@ result_t DataFieldTemplates::addFromFile(vector<string>::iterator& begin, const 
 	vector< vector<string> >* defaults, const string& defaultDest, const string& defaultCircuit, const string& defaultSuffix,
 	const string& filename, unsigned int lineNo)
 {
-	vector<string>::iterator restart = begin;
-	DataField* field = NULL;
+	auto restart = begin;
+
 	string name;
 	if (begin != end) {
 		size_t colon = begin->find(':');
@@ -1705,6 +1691,7 @@ result_t DataFieldTemplates::addFromFile(vector<string>::iterator& begin, const 
 			begin->erase(0, colon+1);
 		}
 	}
+	shared_ptr<DataField> field;
 	result_t result = DataField::create(begin, end, this, field, false, true, false);
 	if (result != RESULT_OK)
 		return result;
@@ -1712,15 +1699,13 @@ result_t DataFieldTemplates::addFromFile(vector<string>::iterator& begin, const 
 	result = add(field, name, true);
 	if (result==RESULT_ERR_DUPLICATE_NAME)
 		begin = restart+1; // mark name as invalid
-	if (result != RESULT_OK)
-		delete field;
 
 	return result;
 }
 
-DataField* DataFieldTemplates::get(const string name)
+shared_ptr<DataField> DataFieldTemplates::get(const string &name)
 {
-	map<string, DataField*>::const_iterator ref = m_fieldsByName.find(name);
+	auto ref = m_fieldsByName.find(name);
 	if (ref == m_fieldsByName.end())
 		return NULL;
 

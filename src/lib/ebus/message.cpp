@@ -50,7 +50,7 @@ Message::Message(const string& circuit, const string& name,
 		const bool isWrite, const bool isPassive, const string comment,
 		const unsigned char srcAddress, const unsigned char dstAddress,
 		const vector<unsigned char> id,
-		DataField* data, const bool deleteData,
+		shared_ptr<DataField> data, const bool deleteData,
 		const unsigned char pollPriority,
 		Condition* condition)
 		: m_circuit(circuit), m_name(name), m_isWrite(isWrite),
@@ -79,7 +79,7 @@ Message::Message(const string& circuit, const string& name,
 Message::Message(const string& circuit, const string& name,
 		const bool isWrite, const bool isPassive,
 		const unsigned char pb, const unsigned char sb,
-		DataField* data, const bool deleteData)
+		shared_ptr<DataField> data, const bool deleteData)
 		: m_circuit(circuit), m_name(name), m_isWrite(isWrite),
 		  m_isPassive(isPassive), m_comment(),
 		  m_srcAddress(SYN), m_dstAddress(SYN),
@@ -142,7 +142,7 @@ result_t Message::parseId(string input, vector<unsigned char>& id)
 
 result_t Message::create(vector<string>::iterator& it, const vector<string>::iterator end,
 		vector< vector<string> >* defaultsRows, Condition* condition, const string& filename,
-		DataFieldTemplates* templates, vector<Message*>& messages)
+		DataFieldTemplates* templates, vector<shared_ptr<Message>>& messages)
 {
 	// [type],[circuit],name,[comment],[QQ[;QQ]*],[ZZ],[PBSB],[ID],fields...
 	result_t result;
@@ -343,10 +343,10 @@ result_t Message::create(vector<string>::iterator& it, const vector<string>::ite
 			realEnd = newTypes.end();
 		}
 	}
-	DataField* data = NULL;
+	shared_ptr<DataField> data;
 	if (it==realEnd) {
-		vector<SingleDataField*> fields;
-		data = new DataFieldSet("", "", fields);
+		vector<shared_ptr<SingleDataField>> fields;
+		data = make_shared<DataFieldSet>("", "", fields);
 	} else {
 		result = DataField::create(it, realEnd, templates, data, isWrite, false, isBroadcastOrMasterDestination, (unsigned char)maxLength);
 		if (result != RESULT_OK) {
@@ -355,7 +355,6 @@ result_t Message::create(vector<string>::iterator& it, const vector<string>::ite
 	}
 	if (id.size() + data->getLength(pt_masterData, (unsigned char)maxLength) > 2 + maxLength || data->getLength(pt_slaveData, (unsigned char)maxLength) > maxLength) {
 		// max NN exceeded
-		delete data;
 		return RESULT_ERR_INVALID_POS;
 	}
 	unsigned int index = 0;
@@ -368,26 +367,26 @@ result_t Message::create(vector<string>::iterator& it, const vector<string>::ite
 			sprintf(num, ".%d", index);
 			useCircuit = useCircuit + num;
 		}
-		Message* message;
+		shared_ptr<Message> message;
 		if (chainIds.size()>1) {
-			message = new ChainedMessage(useCircuit, name, isWrite, comment, srcAddress, dstAddress, id, chainIds, chainLengths, data, index==0, pollPriority, condition);
+			message = make_shared<ChainedMessage>(useCircuit, name, isWrite, comment, srcAddress, dstAddress, id, chainIds, chainLengths, data, index==0, pollPriority, condition);
 		} else
-			message = new Message(useCircuit, name, isWrite, isPassive, comment, srcAddress, dstAddress, id, data, index==0, pollPriority, condition);
+			message = make_shared<Message>(useCircuit, name, isWrite, isPassive, comment, srcAddress, dstAddress, id, data, index==0, pollPriority, condition);
 		messages.push_back(message);
 	}
 	return RESULT_OK;
 }
 
-Message* Message::derive(const unsigned char dstAddress, const unsigned char srcAddress, const string circuit)
+shared_ptr<Message> Message::derive(const unsigned char dstAddress, const unsigned char srcAddress, const string circuit)
 {
-	return new Message(circuit.length()==0 ? m_circuit : circuit, m_name,
+	return make_shared<Message>(circuit.length()==0 ? m_circuit : circuit, m_name,
 		m_isWrite, m_isPassive, m_comment,
 		srcAddress==SYN ? m_srcAddress : srcAddress, dstAddress,
 		m_id, m_data, false,
 		m_pollPriority, m_condition);
 }
 
-Message* Message::derive(const unsigned char dstAddress, const bool extendCircuit)
+shared_ptr<Message> Message::derive(const unsigned char dstAddress, const bool extendCircuit)
 {
 	if (extendCircuit) {
 		ostringstream out;
@@ -721,7 +720,7 @@ ChainedMessage::ChainedMessage(const string circuit, const string name,
 		const unsigned char srcAddress, const unsigned char dstAddress,
 		const vector<unsigned char> id,
 		vector< vector<unsigned char> > ids, vector<unsigned char> lengths,
-		DataField* data, const bool deleteData,
+		shared_ptr<DataField> data, const bool deleteData,
 		const unsigned char pollPriority,
 		Condition* condition)
 		: Message(circuit, name, isWrite, false, comment,
@@ -755,9 +754,9 @@ ChainedMessage::~ChainedMessage()
 	free(m_lastSlaveUpdateTimes);
 }
 
-Message* ChainedMessage::derive(const unsigned char dstAddress, const unsigned char srcAddress, const string circuit)
+shared_ptr<Message> ChainedMessage::derive(const unsigned char dstAddress, const unsigned char srcAddress, const string circuit)
 {
-	return new ChainedMessage(circuit.length()==0 ? m_circuit : circuit, m_name,
+	return make_shared<ChainedMessage>(circuit.length()==0 ? m_circuit : circuit, m_name,
 		m_isWrite, m_comment,
 		srcAddress==SYN ? m_srcAddress : srcAddress, dstAddress,
 		m_id, m_ids, m_lengths, m_data, false,
@@ -952,21 +951,19 @@ void ChainedMessage::dumpColumn(ostream& output, size_t column, bool withConditi
 }
 
 
-Message* getFirstAvailable(vector<Message*> &messages, unsigned char idLength=0, SymbolString* master=NULL) {
-	for (vector<Message*>::iterator msgIt = messages.begin(); msgIt != messages.end(); msgIt++) {
-		Message* message = *msgIt;
-		if (master && !message->checkId(*master))
-			continue;
+shared_ptr<Message> getFirstAvailable(vector<shared_ptr<Message>> &messages, unsigned char idLength=0, SymbolString* master=NULL) {
+    for (auto& message : messages) {
+        if (master && !message->checkId(*master))
+            continue;
 
-		if (message->isAvailable())
-			return *msgIt;
-	}
+        if (message->isAvailable())
+            return message;
+    }
 	return NULL;
 }
 
-Message* getFirstAvailable(vector<Message*> &messages, Message& sameIdExtAs) {
-	for (vector<Message*>::iterator msgIt = messages.begin(); msgIt != messages.end(); msgIt++) {
-		Message* message = *msgIt;
+shared_ptr<Message> getFirstAvailable(vector<shared_ptr<Message>> &messages, Message& sameIdExtAs) {
+	for (auto& message : messages) {
 		if (!message->checkId(sameIdExtAs))
 			continue;
 		if (message->isAvailable())
@@ -1134,7 +1131,7 @@ result_t SimpleCondition::resolve(MessageMap* messages, ostringstream& errorMess
 {
 	if (m_message!=NULL)
 		return RESULT_OK; // already resolved
-	Message* message;
+	shared_ptr<Message> message;
 	if (m_name.length()==0) {
 		message = messages->getScanMessage(m_dstAddress);
 		errorMessage << "scan condition " << nouppercase << setw(2) << hex << setfill('0') << static_cast<unsigned>(m_dstAddress);
@@ -1159,7 +1156,7 @@ result_t SimpleCondition::resolve(MessageMap* messages, ostringstream& errorMess
 		}
 		// clone the message with dedicated dstAddress if necessary
 		unsigned long long key = message->getDerivedKey(m_dstAddress);
-		vector<Message*>* derived = messages->getByKey(key);
+		auto derived = messages->getByKey(key);
 		if (derived==NULL) {
 			message = message->derive(m_dstAddress, true);
 			messages->add(message);
@@ -1192,7 +1189,7 @@ bool SimpleCondition::isTrue()
 	if (m_message->getLastChangeTime()>m_lastCheckTime) {
 		bool isTrue = !m_hasValues; // for message seen check
 		if (!isTrue) {
-			isTrue = checkValue(m_message, m_field);
+			isTrue = checkValue(m_message.get(), m_field);
 		}
 		m_isTrue = isTrue;
 		m_lastCheckTime = m_message->getLastChangeTime();
@@ -1332,14 +1329,14 @@ result_t LoadInstruction::execute(MessageMap* messages, ostringstream& log, void
 }
 
 
-result_t MessageMap::add(Message* message, bool storeByName)
+result_t MessageMap::add(shared_ptr<Message> message, bool storeByName)
 {
 	unsigned long long key = message->getKey();
 	bool conditional = message->isConditional();
 	if (!m_addAll) {
-		map<unsigned long long, vector<Message*> >::iterator keyIt = m_messagesByKey.find(key);
+		auto keyIt = m_messagesByKey.find(key);
 		if (keyIt != m_messagesByKey.end()) {
-			Message* other = getFirstAvailable(keyIt->second, *message);
+			auto other = getFirstAvailable(keyIt->second, *message);
 			if (other != NULL) {
 				if (!conditional)
 					return RESULT_ERR_DUPLICATE; // duplicate key
@@ -1357,9 +1354,9 @@ result_t MessageMap::add(Message* message, bool storeByName)
 		FileReader::tolower(name);
 		string nameKey = string(isPassive ? "P" : (isWrite ? "W" : "R")) + circuit + FIELD_SEPARATOR + name;
 		if (!m_addAll) {
-			map<string, vector<Message*> >::iterator nameIt = m_messagesByName.find(nameKey);
+			auto nameIt = m_messagesByName.find(nameKey);
 			if (nameIt != m_messagesByName.end()) {
-				vector<Message*>* messages = &nameIt->second;
+				auto messages = &nameIt->second;
 				if (!message->isConditional() || !messages->front()->isConditional())
 					return RESULT_ERR_DUPLICATE_NAME; // duplicate key
 			}
@@ -1367,12 +1364,12 @@ result_t MessageMap::add(Message* message, bool storeByName)
 		m_messagesByName[nameKey].push_back(message);
 
 		nameKey = string(isPassive ? "-P" : (isWrite ? "-W" : "-R")) + name; // also store without circuit
-		map<string, vector<Message*> >::iterator nameIt = m_messagesByName.find(nameKey);
+		auto nameIt = m_messagesByName.find(nameKey);
 		if (nameIt == m_messagesByName.end())
 			m_messagesByName[nameKey].push_back(message); // always store first message without circuit (in order of circuit name)
 		else {
-			vector<Message*>* messages = &nameIt->second;
-			Message* first = messages->front();
+			auto messages = &nameIt->second;
+			auto first = messages->front();
 			if (circuit < first->getCircuit())
 				m_messagesByName[nameKey].at(0) = message; // always store first message without circuit (in order of circuit name)
 			else if (m_addAll || (conditional && first->isConditional()))
@@ -1532,15 +1529,14 @@ result_t MessageMap::addFromFile(vector<string>::iterator& begin, const vector<s
 	DataFieldTemplates* templates = getTemplates(filename);
 	istringstream stream(types);
 	string type;
-	vector<Message*> messages;
+	vector<shared_ptr<Message>> messages;
 	while (getline(stream, type, VALUE_SEPARATOR)) {
 		FileReader::trim(type);
 		*restart = type;
 		begin = restart;
 		messages.clear();
 		result = Message::create(begin, end, defaults, condition, filename, templates, messages);
-		for (vector<Message*>::iterator it = messages.begin(); it != messages.end(); it++) {
-			Message* message = *it;
+		for (auto& message : messages) {
 			if (result == RESULT_OK) {
 				result = add(message);
 				if (result==RESULT_ERR_DUPLICATE_NAME)
@@ -1548,8 +1544,6 @@ result_t MessageMap::addFromFile(vector<string>::iterator& begin, const vector<s
 				else if (result==RESULT_ERR_DUPLICATE)
 					begin = restart+8; // mark ID as invalid
 			}
-			if (result != RESULT_OK)
-				delete message; // delete all remaining messages on error
 		}
 		if (result != RESULT_OK)
 			return result;
@@ -1557,17 +1551,17 @@ result_t MessageMap::addFromFile(vector<string>::iterator& begin, const vector<s
 	return result;
 }
 
-Message* MessageMap::getScanMessage(const unsigned char dstAddress)
+shared_ptr<Message> MessageMap::getScanMessage(const unsigned char dstAddress)
 {
 	if (dstAddress==SYN)
 		return m_scanMessage;
 	if (!isValidAddress(dstAddress, false) || isMaster(dstAddress))
 		return NULL;
 	unsigned long long key = m_scanMessage->getDerivedKey(dstAddress);
-	vector<Message*>* msgs = getByKey(key);
+	auto msgs = getByKey(key);
 	if (msgs!=NULL)
 		return msgs->front();
-	Message* message = m_scanMessage->derive(dstAddress, true);
+	shared_ptr<Message> message = m_scanMessage->derive(dstAddress, true);
 	add(message);
 	return message;
 }
@@ -1676,14 +1670,14 @@ string MessageMap::getLoadedFiles(unsigned char address)
 	return m_loadedFiles[address];
 }
 
-vector<Message*>* MessageMap::getByKey(const unsigned long long key) {
-	map<unsigned long long, vector<Message*> >::iterator it = m_messagesByKey.find(key);
+vector<shared_ptr<Message>>* MessageMap::getByKey(const unsigned long long key) {
+	auto it = m_messagesByKey.find(key);
 	if (it != m_messagesByKey.end())
 		return &it->second;
 	return NULL;
 }
 
-Message* MessageMap::find(const string& circuit, const string& name, const bool isWrite, const bool isPassive)
+shared_ptr<Message> MessageMap::find(const string& circuit, const string& name, const bool isWrite, const bool isPassive)
 {
 	string lcircuit = circuit;
 	FileReader::tolower(lcircuit);
@@ -1697,9 +1691,9 @@ Message* MessageMap::find(const string& circuit, const string& name, const bool 
 			key = string(isPassive ? "-P" : (isWrite ? "-W" : "-R")) + lname; // second try: without circuit
 		else
 			continue; // not allowed without circuit
-		map<string, vector<Message*> >::iterator it = m_messagesByName.find(key);
+		auto it = m_messagesByName.find(key);
 		if (it != m_messagesByName.end()) {
-			Message* message = getFirstAvailable(it->second);
+			auto message = getFirstAvailable(it->second);
 			if (message)
 				return message;
 		}
@@ -1708,20 +1702,20 @@ Message* MessageMap::find(const string& circuit, const string& name, const bool 
 	return NULL;
 }
 
-deque<Message*> MessageMap::findAll(const string& circuit, const string& name, const bool completeMatch,
+deque<shared_ptr<Message>> MessageMap::findAll(const string& circuit, const string& name, const bool completeMatch,
 	const bool withRead, const bool withWrite, const bool withPassive)
 {
-	deque<Message*> ret;
+	deque<shared_ptr<Message>> ret;
 	string lcircuit = circuit;
 	FileReader::tolower(lcircuit);
 	string lname = name;
 	FileReader::tolower(lname);
 	bool checkCircuit = lcircuit.length() > 0;
 	bool checkName = name.length() > 0;
-	for (map<string, vector<Message*> >::iterator it = m_messagesByName.begin(); it != m_messagesByName.end(); it++) {
+	for (auto it = m_messagesByName.begin(); it != m_messagesByName.end(); it++) {
 		if (it->first[0] == '-') // avoid duplicates: instances stored multiple times have a key starting with "-"
 			continue;
-		Message* message = getFirstAvailable(it->second);
+		auto message = getFirstAvailable(it->second);
 		if (!message)
 			continue;
 		if (checkCircuit) {
@@ -1754,7 +1748,7 @@ deque<Message*> MessageMap::findAll(const string& circuit, const string& name, c
 	return ret;
 }
 
-Message* MessageMap::find(SymbolString& master, bool anyDestination,
+shared_ptr<Message> MessageMap::find(SymbolString& master, bool anyDestination,
 	const bool withRead, const bool withWrite, const bool withPassive)
 {
 	if (master.size() < 5)
@@ -1780,11 +1774,11 @@ Message* MessageMap::find(SymbolString& master, bool anyDestination,
 				exp = 3;
 		}
 
-		map<unsigned long long , vector<Message*> >::iterator it;
+		map<unsigned long long , vector<shared_ptr<Message>> >::iterator it;
 		if (withPassive) {
 			it = m_messagesByKey.find(key);
 			if (it != m_messagesByKey.end()) {
-				Message* message = getFirstAvailable(it->second, idLength, &master);
+				auto message = getFirstAvailable(it->second, idLength, &master);
 				if (message)
 					return message;
 			}
@@ -1792,7 +1786,7 @@ Message* MessageMap::find(SymbolString& master, bool anyDestination,
 				key &= ~ID_SOURCE_MASK;
 				it = m_messagesByKey.find(key & ~ID_SOURCE_MASK); // try again without specific source master
 				if (it != m_messagesByKey.end()) {
-					Message* message = getFirstAvailable(it->second, idLength, &master);
+					auto message = getFirstAvailable(it->second, idLength, &master);
 					if (message)
 						return message;
 				}
@@ -1803,7 +1797,7 @@ Message* MessageMap::find(SymbolString& master, bool anyDestination,
 		if (withRead) {
 			it = m_messagesByKey.find(key | ID_SOURCE_ACTIVE_READ); // try again with special value for active read
 			if (it != m_messagesByKey.end()) {
-				Message* message = getFirstAvailable(it->second, idLength, &master);
+				auto message = getFirstAvailable(it->second, idLength, &master);
 				if (message)
 					return message;
 			}
@@ -1811,7 +1805,7 @@ Message* MessageMap::find(SymbolString& master, bool anyDestination,
 		if (withWrite) {
 			it = m_messagesByKey.find(key | ID_SOURCE_ACTIVE_WRITE); // try again with special value for active write
 			if (it != m_messagesByKey.end()) {
-				Message* message = getFirstAvailable(it->second, idLength, &master);
+				auto message = getFirstAvailable(it->second, idLength, &master);
 				if (message)
 					return message;
 			}
@@ -1823,7 +1817,7 @@ Message* MessageMap::find(SymbolString& master, bool anyDestination,
 	return NULL;
 }
 
-void MessageMap::invalidateCache(Message* message)
+void MessageMap::invalidateCache(shared_ptr<Message> message)
 {
 	if (message->m_data==DataFieldSet::getIdentFields())
 		return;
@@ -1833,9 +1827,9 @@ void MessageMap::invalidateCache(Message* message)
 	if (pos!=string::npos)
 		circuit.resize(pos);
 	string name = message->getName();
-	deque<Message*> messages = findAll(circuit, name, false, true, true, true);
-	for (deque<Message*>::iterator it = messages.begin(); it != messages.end(); it++) {
-		Message* checkMessage = *it;
+	auto messages = findAll(circuit, name, false, true, true, true);
+	for (auto it = messages.begin(); it != messages.end(); it++) {
+		auto checkMessage = *it;
 		if (checkMessage==message
 		|| name!=checkMessage->getName())
 			continue; // check exact name
@@ -1851,7 +1845,7 @@ void MessageMap::invalidateCache(Message* message)
 	}
 }
 
-void MessageMap::addPollMessage(Message* message, bool toFront)
+void MessageMap::addPollMessage(shared_ptr<Message> message, bool toFront)
 {
 	if (message != NULL && message->getPollPriority() > 0) {
 		message->m_lastPollTime = toFront ? 0 : m_pollMessages.size();
@@ -1868,45 +1862,40 @@ void MessageMap::clear()
 		m_pollMessages.pop();
 	}
 	// free message instances by name
-	for (map<string, vector<Message*> >::iterator it = m_messagesByName.begin(); it != m_messagesByName.end(); it++) {
-		vector<Message*> nameMessages = it->second;
+	for (auto it = m_messagesByName.begin(); it != m_messagesByName.end(); it++) {
+		auto nameMessages = it->second;
 		if (it->first[0] != '-') { // avoid double free: instances stored multiple times have a key starting with "-"
-			for (vector<Message*>::iterator nit = nameMessages.begin(); nit != nameMessages.end(); nit++) {
-				Message* message = *nit;
-				map<unsigned long long, vector<Message*> >::iterator keyIt = m_messagesByKey.find(message->getKey());
+			for (auto nit = nameMessages.begin(); nit != nameMessages.end(); nit++) {
+				auto message = *nit;
+				auto keyIt = m_messagesByKey.find(message->getKey());
 				if (keyIt != m_messagesByKey.end()) {
-					vector<Message*>* keyMessages = &keyIt->second;
+					auto keyMessages = &keyIt->second;
 					if (!keyMessages->empty()) {
-						for (vector<Message*>::iterator kit = keyMessages->begin(); kit != keyMessages->end(); kit++) {
+						for (auto kit = keyMessages->begin(); kit != keyMessages->end(); kit++) {
 							if (*kit==message) {
 								keyMessages->erase(kit--);
 							}
 						}
 					}
 				}
-				delete message;
 			}
 		}
 		nameMessages.clear();
 	}
 	// free remaining message instances by key
-	for (map<unsigned long long, vector<Message*> >::iterator it = m_messagesByKey.begin(); it != m_messagesByKey.end(); it++) {
-		vector<Message*> keyMessages = it->second;
-		for (vector<Message*>::iterator kit = keyMessages.begin(); kit != keyMessages.end(); kit++) {
-			Message* message = *kit;
-			delete message;
-		}
+	for (auto it = m_messagesByKey.begin(); it != m_messagesByKey.end(); it++) {
+		auto keyMessages = it->second;
 		keyMessages.clear();
 	}
 	// free condition instances
-	for (map<string, Condition*>::iterator it = m_conditions.begin(); it != m_conditions.end(); it++) {
+	for (auto it = m_conditions.begin(); it != m_conditions.end(); it++) {
 		delete it->second;
 	}
 	// free instruction instances
-	for (map<string, vector<Instruction*> >::iterator it = m_instructions.begin(); it != m_instructions.end(); it++) {
-		vector<Instruction*> instructions = it->second;
-		for (vector<Instruction*>::iterator lit = instructions.begin(); lit != instructions.end(); lit++) {
-			Instruction* instruction = *lit;
+	for (auto it = m_instructions.begin(); it != m_instructions.end(); it++) {
+		auto instructions = it->second;
+		for (auto lit = instructions.begin(); lit != instructions.end(); lit++) {
+			auto instruction = *lit;
 			delete instruction;
 		}
 		instructions.clear();
@@ -1923,11 +1912,11 @@ void MessageMap::clear()
 	m_maxIdLength = 0;
 }
 
-Message* MessageMap::getNextPoll()
+shared_ptr<Message> MessageMap::getNextPoll()
 {
 	if (m_pollMessages.empty())
 		return NULL;
-	Message* ret = m_pollMessages.top();
+	auto ret = m_pollMessages.top();
 	m_pollMessages.pop();
 	ret->m_pollCount++;
 	time(&(ret->m_lastPollTime));
@@ -1938,12 +1927,12 @@ Message* MessageMap::getNextPoll()
 void MessageMap::dump(ostream& output, bool withConditions)
 {
 	bool first = true;
-	for (map<string, vector<Message*> >::iterator it = m_messagesByName.begin(); it != m_messagesByName.end(); it++) {
+	for (auto it = m_messagesByName.begin(); it != m_messagesByName.end(); it++) {
 		if (it->first[0] == '-') // skip instances stored multiple times (key starting with "-")
 			continue;
 		if (m_addAll) {
-			for (vector<Message*>::iterator mit = it->second.begin(); mit != it->second.end(); mit++) {
-				Message* message = *mit;
+			for (auto mit = it->second.begin(); mit != it->second.end(); mit++) {
+				auto message = *mit;
 				if (!message)
 					continue;
 				if (first)
@@ -1953,7 +1942,7 @@ void MessageMap::dump(ostream& output, bool withConditions)
 				message->dump(output, NULL, withConditions);
 			}
 		} else {
-			Message* message = getFirstAvailable(it->second);
+			auto message = getFirstAvailable(it->second);
 			if (!message)
 				continue;
 			if (first)

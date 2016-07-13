@@ -125,7 +125,7 @@ void Connection::run()
 
 			// decode client data
 			if (message.add(data)) {
-				m_netQueue->push(&message);
+				m_netQueue.push(&message);
 
 				// wait for result
 				logDebug(lf_network, "[%05d] wait for result", getID());
@@ -143,25 +143,23 @@ void Connection::run()
 
 	}
 
-	delete m_socket;
-	m_socket = NULL;
 	logInfo(lf_network, "[%05d] connection closed", getID());
 }
 
 
-Network::Network(const bool local, const uint16_t port, const uint16_t httpPort, Queue<NetMessage*>* netQueue)
+Network::Network(const bool local, const uint16_t port, const uint16_t httpPort, Queue<NetMessage*>& netQueue)
 	: m_netQueue(netQueue), m_listening(false)
 {
 	if (local)
-		m_tcpServer = new TCPServer(port, "127.0.0.1");
+		m_tcpServer = std::make_unique<TCPServer>(port, "127.0.0.1");
 	else
-		m_tcpServer = new TCPServer(port, "0.0.0.0");
+		m_tcpServer = std::make_unique<TCPServer>(port, "0.0.0.0");
 
 	if (m_tcpServer != NULL && m_tcpServer->start() == 0)
 		m_listening = true;
 
 	if (httpPort>0) {
-		m_httpServer = new TCPServer(httpPort, "0.0.0.0");
+		m_httpServer = std::make_unique<TCPServer>(httpPort, "0.0.0.0");
 		m_httpServer->start();
 	} else
 		m_httpServer = NULL;
@@ -171,19 +169,9 @@ Network::~Network()
 {
 	stop();
 
-	while (!m_connections.empty()) {
-		Connection* connection = m_connections.back();
-		m_connections.pop_back();
-		connection->stop();
-		connection->join();
-		delete connection;
-	}
-	join();
+    m_connections.clear();
 
-	if (m_tcpServer != NULL)
-		delete m_tcpServer;
-	if (m_httpServer != NULL)
-		delete m_httpServer;
+	join();
 }
 
 void Network::run()
@@ -281,11 +269,11 @@ void Network::run()
 #endif
 #endif
 		if (newData) {
-			TCPSocket* socket = (isHttp ? m_httpServer : m_tcpServer)->newSocket();
+			auto socket = (isHttp ? m_httpServer : m_tcpServer)->newSocket();
 			if (socket == NULL)
 				continue;
 
-			Connection* connection = new Connection(socket, isHttp, m_netQueue);
+			auto connection = make_shared<Connection>(socket, isHttp, m_netQueue);
 			if (connection == NULL)
 				continue;
 
@@ -298,12 +286,10 @@ void Network::run()
 
 void Network::cleanConnections()
 {
-	list<Connection*>::iterator c_it;
-	for (c_it = m_connections.begin(); c_it != m_connections.end(); c_it++) {
+	for (auto c_it = m_connections.begin(); c_it != m_connections.end(); c_it++) {
 		if (!(*c_it)->isRunning()) {
-			Connection* connection = *c_it;
+			auto connection = *c_it;
 			c_it = m_connections.erase(c_it);
-			delete connection;
 			logDebug(lf_network, "dead connection removed - %d", m_connections.size());
 		}
 	}

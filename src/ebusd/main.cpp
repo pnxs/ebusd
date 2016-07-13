@@ -95,10 +95,10 @@ static struct options opt = {
 };
 
 /** the @a MessageMap instance, or NULL. */
-static MessageMap* s_messageMap = NULL;
+static std::unique_ptr<MessageMap> s_messageMap;
 
 /** the @a MainLoop instance, or NULL. */
-static MainLoop* s_mainLoop = NULL;
+static std::unique_ptr<MainLoop> s_mainLoop;
 
 /** the version string of the program. */
 const char *argp_program_version = "" PACKAGE_STRING "." REVISION "";
@@ -480,19 +480,13 @@ void closePidFile()
 void shutdown()
 {
 	// stop main loop and all dependent components
-	if (s_mainLoop != NULL) {
-		delete s_mainLoop;
-		s_mainLoop = NULL;
-	}
-	if (s_messageMap!=NULL) {
-		delete s_messageMap;
-		s_messageMap = NULL;
-	}
+	s_mainLoop.reset();
+	s_messageMap.reset();
+
 	// free templates
-	for (map<string, DataFieldTemplates*>::iterator it = templatesByPath.begin(); it != templatesByPath.end(); it++) {
-		if (it->second!=&globalTemplates)
-			delete it->second;
-		it->second = NULL;
+	for (auto& tp : templatesByPath) {
+		if (tp.second!=&globalTemplates)
+			delete tp.second;
 	}
 	templatesByPath.clear();
 
@@ -590,7 +584,7 @@ DataFieldTemplates* getTemplates(const string filename) {
 	size_t pos = filename.find_last_of('/');
 	if (pos!=string::npos)
 		path = filename.substr(0, pos);
-	map<string, DataFieldTemplates*>::iterator it = templatesByPath.find(path);
+	auto it = templatesByPath.find(path);
 	if (it!=templatesByPath.end()) {
 		return it->second;
 	}
@@ -607,8 +601,8 @@ DataFieldTemplates* getTemplates(const string filename) {
  * @return the @a DataFieldTemplates.
  */
 static bool readTemplates(const string path, const string extension, bool available, bool verbose=false) {
-	map<string, DataFieldTemplates*>::iterator it = templatesByPath.find(path);
-	if (it!=templatesByPath.end()) {
+	auto it = templatesByPath.find(path);
+	if (it != templatesByPath.end()) {
 		return false;
 	}
 	DataFieldTemplates* templates;
@@ -683,10 +677,11 @@ result_t loadConfigFiles(MessageMap* messages, bool verbose, bool denyRecursive)
 	logInfo(lf_main, "loading configuration files from %s", opt.configPath);
 	messages->clear();
 	globalTemplates.clear();
-	for (map<string, DataFieldTemplates*>::iterator it = templatesByPath.begin(); it != templatesByPath.end(); it++) {
-		if (it->second!=&globalTemplates)
-			delete it->second;
-		it->second = NULL;
+
+	for (auto& tp : templatesByPath)
+	{
+		if (tp.second!=&globalTemplates)
+			delete tp.second;
 	}
 	templatesByPath.clear();
 
@@ -729,7 +724,7 @@ result_t loadScanConfigFile(MessageMap* messages, unsigned char address, SymbolS
 			return RESULT_EMPTY;
 		}
 	}
-	DataFieldSet* identFields = DataFieldSet::getIdentFields();
+	auto identFields = DataFieldSet::getIdentFields();
 	string path, prefix, ident; // path: cfgpath/MANUFACTURER, prefix: ZZ., ident: C[C[C[C[C]]]], SW: xxxx, HW: xxxx
 	unsigned int sw, hw;
 	ostringstream out;
@@ -900,11 +895,11 @@ int main(int argc, char* argv[])
 	if (argp_parse(&argp, argc, argv, ARGP_IN_ORDER, &arg_index, &opt) != 0)
 		return EINVAL;
 
-	s_messageMap = new MessageMap(opt.checkConfig && opt.scanConfig && arg_index >= argc);
+	s_messageMap = std::make_unique<MessageMap>(opt.checkConfig && opt.scanConfig && arg_index >= argc);
 	if (opt.checkConfig) {
 		logNotice(lf_main, PACKAGE_STRING "." REVISION " performing configuration check...");
 
-		result_t result = loadConfigFiles(s_messageMap, true, opt.scanConfig && arg_index < argc);
+		result_t result = loadConfigFiles(s_messageMap.get(), true, opt.scanConfig && arg_index < argc);
 
 		while (result == RESULT_OK && opt.scanConfig && arg_index < argc) {
 			// check scan config for each passed ident message
@@ -929,7 +924,7 @@ int main(int argc, char* argv[])
 			}
 			unsigned char address = master[1];
 			string file;
-			res = loadScanConfigFile(s_messageMap, address, slave, file, true);
+			res = loadScanConfigFile(s_messageMap.get(), address, slave, file, true);
 			if (res==RESULT_OK)
 				logInfo(lf_main, "scan config %2.2x: file %s loaded", address, file.c_str());
 		}
@@ -964,12 +959,12 @@ int main(int argc, char* argv[])
 	logNotice(lf_main, PACKAGE_STRING "." REVISION " started");
 
 	// load configuration files
-	loadConfigFiles(s_messageMap);
+	loadConfigFiles(s_messageMap.get());
 	if (s_messageMap->sizeConditions()>0 && opt.pollInterval==0)
 		logError(lf_main, "conditions require a poll interval > 0");
 
 	// create the MainLoop and run it
-	s_mainLoop = new MainLoop(opt, device, s_messageMap);
+	s_mainLoop = std::make_unique<MainLoop>(opt, device, s_messageMap.get());
 	s_mainLoop->start("mainloop");
 	s_mainLoop->join();
 

@@ -7,12 +7,15 @@
 #include <iostream>
 #include <iomanip>
 #include <queue>
+#include <memory>
 
 using std::string;
 using std::vector;
 using std::map;
 using std::deque;
 using std::list;
+using std::shared_ptr;
+using std::make_shared;
 
 using std::ofstream;
 using std::ifstream;

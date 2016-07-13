@@ -74,7 +74,7 @@ MainLoop::MainLoop(const struct options& opt, Device *device, MessageMap* messag
 
 	// create network
 	m_htmlPath = opt.htmlPath;
-	m_network = std::make_unique<Network>(opt.localOnly, opt.port, opt.httpPort, &m_netQueue);
+	m_network = std::make_unique<Network>(opt.localOnly, opt.port, opt.httpPort, m_netQueue);
 	m_network->start("network");
 }
 
@@ -107,7 +107,7 @@ void MainLoop::run()
 				} else {
 					SymbolString slave(false);
 					if (scanned) {
-						Message* message = m_messages->getScanMessage(lastScanAddress);
+						auto message = m_messages->getScanMessage(lastScanAddress);
 						slave = message->getLastSlaveData();
 						scanned = message->getLastUpdateTime()>0;
 					} else {
@@ -295,7 +295,7 @@ result_t MainLoop::parseHexMaster(vector<string> &args, size_t argPos, SymbolStr
 	return ret;
 }
 
-result_t MainLoop::readFromBus(Message* message, string inputStr, const unsigned char dstAddress)
+result_t MainLoop::readFromBus(shared_ptr<Message> message, string inputStr, const unsigned char dstAddress)
 {
 	result_t ret = RESULT_EMPTY;
 	SymbolString master(true);
@@ -410,7 +410,7 @@ string MainLoop::executeRead(vector<string> &args)
 		logNotice(lf_main, "read hex cmd: %s", cacheMaster.getDataStr(true, false).c_str());
 
 		// find message
-		Message* message = m_messages->find(cacheMaster, false, true, false, false);
+		auto message = m_messages->find(cacheMaster, false, true, false, false);
 
 		if (message == NULL)
 			return getResultCode(RESULT_ERR_NOTFOUND);
@@ -480,7 +480,7 @@ string MainLoop::executeRead(vector<string> &args)
 	}
 
 	ostringstream result;
-	Message* message = m_messages->find(circuit, args[argPos], false);
+	auto message = m_messages->find(circuit, args[argPos], false);
 
 	// adjust poll priority
 	if (message != NULL && pollPriority > 0 && message->setPollPriority(pollPriority)) {
@@ -488,7 +488,7 @@ string MainLoop::executeRead(vector<string> &args)
 	}
 
 	if (dstAddress==SYN && maxAge > 0) {
-		Message* cacheMessage = m_messages->find(circuit, args[argPos], false, true);
+		auto cacheMessage = m_messages->find(circuit, args[argPos], false, true);
 		bool hasCache = cacheMessage != NULL;
 		if (!hasCache || (message != NULL && message->getLastUpdateTime() > cacheMessage->getLastUpdateTime()))
 			cacheMessage = message; // message is newer/better
@@ -582,7 +582,7 @@ string MainLoop::executeWrite(vector<string> &args)
 		logNotice(lf_main, "write hex cmd: %s", cacheMaster.getDataStr(true, false).c_str());
 
 		// find message
-		Message* message = m_messages->find(cacheMaster, false, false, true, false);
+		auto message = m_messages->find(cacheMaster, false, false, true, false);
 
 		if (message == NULL)
 			return getResultCode(RESULT_ERR_NOTFOUND);
@@ -631,7 +631,7 @@ string MainLoop::executeWrite(vector<string> &args)
 			   "    NN        number of following data bytes\n"
 			   "    Dx        data byte(s) to send";
 
-	Message* message = m_messages->find(circuit, args[argPos], true);
+	auto message = m_messages->find(circuit, args[argPos], true);
 
 	if (message == NULL)
 		return getResultCode(RESULT_ERR_NOTFOUND);
@@ -814,15 +814,15 @@ string MainLoop::executeFind(vector<string> &args)
 			   "  -c CIRCUIT    limit to messages of CIRCUIT (or a part thereof without '-e')\n"
 			   "  NAME          NAME of the messages to find (or a part thereof without '-e')";
 
-	deque<Message*> messages = m_messages->findAll(
+	deque<shared_ptr<Message>> messages = m_messages->findAll(
 		circuit, args.size() == argPos ? "" : args[argPos], exact, withRead, withWrite, withPassive
 	);
 
 	bool found = false;
 	ostringstream result;
 	char str[32];
-	for (deque<Message*>::iterator it = messages.begin(); it < messages.end();) {
-		Message* message = *it++;
+	for (auto it = messages.begin(); it < messages.end();) {
+		auto message = *it++;
 		if (!id.empty() && !message->checkIdPrefix(id)) {
 			continue;
 		}
@@ -976,7 +976,7 @@ string MainLoop::executeScan(vector<string> &args)
 		if (result != RESULT_OK)
 			return getResultCode(result);
 
-		Message* message = m_messages->getScanMessage(dstAddress); // never NULL due to scanAndWait() == RESULT_OK
+		auto message = m_messages->getScanMessage(dstAddress); // never NULL due to scanAndWait() == RESULT_OK
 		ostringstream ret;
 		ret << hex << setw(2) << setfill('0') << static_cast<unsigned>(dstAddress);
 		result = message->decodeLastData(ret, 0, true); // decode data
@@ -1180,14 +1180,14 @@ string MainLoop::executeGet(vector<string> &args, bool& connected)
 					break;
 			}
 		}
-		deque<Message*> messages = m_messages->findAll(circuit, name, exact, true, false, true);
+		auto messages = m_messages->findAll(circuit, name, exact, true, false, true);
 
 		bool first = true;
 		result << "{";
 		string lastCircuit = "";
 		time_t maxLastUp = 0;
-		for (deque<Message*>::iterator it = messages.begin(); ret == RESULT_OK && it < messages.end();) {
-			Message* message = *it++;
+		for (auto it = messages.begin(); ret == RESULT_OK && it < messages.end();) {
+			auto message = *it++;
 			unsigned char dstAddress = message->getDstAddress();
 			if (dstAddress == SYN)
 				continue;
@@ -1345,11 +1345,10 @@ string MainLoop::getUpdates(time_t since, time_t until)
 {
 	ostringstream result;
 
-	deque<Message*> messages;
-	messages = m_messages->findAll("", "", false, true, true, true);
+	auto messages = m_messages->findAll("", "", false, true, true, true);
 
-	for (deque<Message*>::iterator it = messages.begin(); it < messages.end();) {
-		Message* message = *it++;
+	for (auto it = messages.begin(); it < messages.end();) {
+		auto message = *it++;
 		unsigned char dstAddress = message->getDstAddress();
 		if (dstAddress == SYN)
 			continue;
