@@ -29,7 +29,8 @@
 #include <fstream>
 #include <iomanip>
 
-using namespace std;
+using std::fstream;
+using std::ios;
 
 /** A structure holding all program options. */
 struct options
@@ -49,14 +50,14 @@ static struct options opt = {
 };
 
 /** the version string of the program. */
-const char *argp_program_version = "ebusfeed of """PACKAGE_STRING"";
+const char *argp_program_version = "ebusfeed of """ PACKAGE_STRING "";
 
 /** the report bugs to address of the program. */
-const char *argp_program_bug_address = ""PACKAGE_BUGREPORT"";
+const char *argp_program_bug_address = "" PACKAGE_BUGREPORT "";
 
 /** the documentation of the program. */
 static const char argpdoc[] =
-	"Feed data from an "PACKAGE" DUMPFILE to a serial device.\n"
+	"Feed data from an " PACKAGE " DUMPFILE to a serial device.\n"
 	"\v"
 	"With no DUMPFILE, /tmp/ebus_dump.bin is used.\n"
 	"\n"
@@ -65,7 +66,7 @@ static const char argpdoc[] =
 	"  2. create symbol links to appropriate devices, e.g.\n"
 	"     'ln -s /dev/pts/2 /dev/ttyUSB60'\n"
 	"     'ln -s /dev/pts/3 /dev/ttyUSB20'\n"
-	"  3. start "PACKAGE": '"PACKAGE" -f -d /dev/ttyUSB20 --nodevicecheck'\n"
+	"  3. start " PACKAGE ": '" PACKAGE " -f -d /dev/ttyUSB20 --nodevicecheck'\n"
 	"  4. start ebusfeed: 'ebusfeed /path/to/ebus_dump.bin'\n";
 
 /** the description of the accepted arguments. */
