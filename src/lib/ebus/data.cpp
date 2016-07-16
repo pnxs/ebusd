@@ -1450,10 +1450,19 @@ unsigned char DataFieldSet::getLength(PartType partType, unsigned char maxLength
 {
 	unsigned char length = 0;
 
-	bool previousFullByteOffset[] = { true, true, true, true };
+    struct BoolDefaultTrue
+    {
+        operator bool() { return m_value; }
+        bool operator=(bool b) { m_value = b; return m_value; }
+        bool m_value = true;
+    };
+
+	//bool previousFullByteOffset[] = { true, true, true, true };
+    map<PartType, BoolDefaultTrue> previousFullByteOffset;
 
 	for (auto& field : m_fields) {
 		if (field->getPartType() == partType) {
+
 			if (!previousFullByteOffset[partType] && !field->hasFullByteOffset(false))
 				length--;
 
@@ -1554,7 +1563,10 @@ result_t DataFieldSet::read(const PartType partType,
 		ostringstream& output, OutputFormat outputFormat, signed char outputIndex,
 		bool leadingSeparator, const char* fieldName, signed char fieldIndex)
 {
-	bool previousFullByteOffset = true, found = false, findFieldIndex = fieldName != NULL && fieldIndex >= 0;
+	bool previousFullByteOffset = true;
+	bool found = false;
+	bool findFieldIndex = fieldName != NULL && fieldIndex >= 0;
+
 	if (!m_uniqueNames && outputIndex<0)
 		outputIndex = 0;
 	for (auto& field : m_fields) {
