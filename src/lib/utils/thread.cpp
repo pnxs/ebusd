@@ -21,54 +21,53 @@
 #endif
 
 #include "thread.h"
-#include "clock.h"
 
-void* Thread::runThread(void* arg)
-{
-	((Thread*)arg)->enter();
-	return NULL;
-}
 
 Thread::~Thread()
 {
 	if (m_started) {
-		pthread_cancel(m_threadid);
-		pthread_detach(m_threadid);
+		pthread_cancel(m_thread.native_handle());
+		pthread_detach(m_thread.native_handle());
 	}
+}
+
+void Thread::setName(const string& name)
+{
+#ifdef HAVE_PTHREAD_SETNAME_NP
+#ifndef __MACH__
+		pthread_setname_np(m_thread.native_handle(), name.c_str());
+#endif
+#endif
 }
 
 bool Thread::start(const char* name)
 {
-
-	int result = pthread_create(&m_threadid, NULL, runThread, this);
-
-	if (result == 0) {
-
-#ifdef HAVE_PTHREAD_SETNAME_NP
-#ifndef __MACH__
-		pthread_setname_np(m_threadid, name);
-#endif
-#endif
-
+	try {
+		m_thread = std::thread(std::bind(&Thread::enter, this));
+		setName(name);
 		m_started = true;
-
 		return true;
 	}
-
-	return false;
+	catch(const std::exception& e)
+	{
+		m_started = false;
+		return false;
+	}
 }
 
 bool Thread::join()
 {
 	int result = -1;
 
-	if (m_started) {
-		m_stopped = true;
-		result = pthread_join(m_threadid, NULL);
-
-		if (result == 0) {
+	try {
+		if (m_started) {
+			m_stopped = true;
+			m_thread.join();
 			m_started = false;
 		}
+	}
+	catch(const std::exception& e)
+	{
 	}
 
 	return result == 0;
@@ -80,43 +79,28 @@ void Thread::enter() {
 	m_running = false;
 }
 
-
-WaitThread::WaitThread()
-	: Thread()
-{
-	pthread_mutex_init(&m_mutex, NULL);
-	pthread_cond_init(&m_cond, NULL);
-}
-
-WaitThread::~WaitThread()
-{
-	pthread_mutex_destroy(&m_mutex);
-	pthread_cond_destroy(&m_cond);
-}
-
 void WaitThread::stop()
 {
-	pthread_mutex_lock(&m_mutex);
-	pthread_cond_signal(&m_cond);
-	pthread_mutex_unlock(&m_mutex);
+	m_mutex.lock();
+	m_cond.notify_one();
+	m_mutex.unlock();
+
 	Thread::stop();
 }
 
 bool WaitThread::join()
 {
-	pthread_mutex_lock(&m_mutex);
-	pthread_cond_signal(&m_cond);
-	pthread_mutex_unlock(&m_mutex);
+	m_mutex.lock();
+	m_cond.notify_one();
+	m_mutex.unlock();
+
 	return Thread::join();
 }
 
 bool WaitThread::Wait(int seconds)
 {
-	struct timespec t;
-	clockGettime(&t);
-	t.tv_sec += seconds;
-	pthread_mutex_lock(&m_mutex);
-	pthread_cond_timedwait(&m_cond, &m_mutex, &t);
-	pthread_mutex_unlock(&m_mutex);
+	std::unique_lock<std::mutex> lock(m_mutex);
+	m_cond.wait_for(lock, std::chrono::seconds(seconds));
+
 	return isRunning();
 }

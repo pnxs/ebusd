@@ -19,7 +19,8 @@
 #ifndef LIBUTILS_THREAD_H_
 #define LIBUTILS_THREAD_H_
 
-#include <pthread.h>
+#include <thread>
+#include "cppconfig.h"
 
 /** \file thread.h */
 
@@ -34,13 +35,6 @@ public:
 	 * virtual destructor.
 	 */
 	virtual ~Thread();
-
-	/**
-	 * Thread entry helper for pthread_create.
-	 * @param arg pointer to the @a Thread.
-	 * @return NULL.
-	 */
-	static void* runThread(void* arg);
 
 	/**
 	 * Return whether this @a Thread is still running and not yet stopped.
@@ -67,10 +61,10 @@ public:
 	virtual bool join();
 
 	/**
-	 * Get the thread id.
-	 * @return the thread id.
+	 * Sets the name of the thread (if available)
+	 * @param name
 	 */
-	pthread_t self() { return m_threadid; }
+	void setName(const string& name);
 
 protected:
 
@@ -87,7 +81,7 @@ private:
 	void enter();
 
 	/** own thread id */
-	pthread_t m_threadid;
+	std::thread m_thread;
 
 	/** Whether the thread was started. */
 	bool m_started = false;
@@ -108,14 +102,9 @@ class WaitThread : public Thread
 
 public:
 	/**
-	 * Constructor.
-	 */
-	WaitThread();
-
-	/**
 	 * Destructor.
 	 */
-	virtual ~WaitThread();
+	virtual ~WaitThread() {}
 
 	// @copydoc
 	virtual void stop();
@@ -132,10 +121,10 @@ public:
 
 private:
 	/** the mutex for waiting. */
-	pthread_mutex_t m_mutex;
+	std::mutex m_mutex;
 
 	/** the condition for waiting. */
-	pthread_cond_t m_cond;
+	std::condition_variable m_cond;
 
 };
 
