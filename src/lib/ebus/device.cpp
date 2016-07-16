@@ -22,6 +22,8 @@
 
 #include "device.h"
 #include "data.h"
+#include <array>
+#include <regex>
 #include <cstdlib>
 #include <cstring>
 #include <fcntl.h>
@@ -45,45 +47,48 @@ Device::~Device()
 	m_dumpRawStream.close();
 }
 
-Device* Device::create(const char* name, const bool checkDevice, const bool readOnly, const bool initialSend,
+shared_ptr<Device> Device::create(const string& name, const bool checkDevice, const bool readOnly, const bool initialSend,
 		void (*logRawFunc)(const unsigned char byte, bool received))
 {
-	if (strchr(name, '/') == NULL && strchr(name, ':') != NULL) {
-		char* in = strdup(name);
-		bool udp = false;
-		char* addrpos = in;
-		char* portpos = strchr(addrpos, ':');
-		if (portpos==addrpos+3 && (strncmp(addrpos, "tcp", 3)==0 || (udp=(strncmp(addrpos, "udp", 3)==0)))) {
-			addrpos += 4;
-			portpos = strchr(addrpos, ':');
-		}
-		if (portpos==NULL) {
-			free(in);
-			return NULL; // invalid protocol or missing port
-		}
-		result_t result = RESULT_OK;
-		unsigned int port = parseInt(portpos+1, 10, 1, 65535, result);
-		if (result!=RESULT_OK) {
-			free(in);
-			return NULL; // invalid port
-		}
-		struct sockaddr_in address;
-		memset((char*)&address, 0, sizeof(address));
-		*portpos = 0;
-		if (inet_aton(addrpos, &address.sin_addr) == 0) {
-			struct hostent* h = gethostbyname(addrpos);
-			if (h == NULL) {
-				free(in);
-				return NULL; // invalid host
+	if (name.find('/') == string::npos && name.find(':') != string::npos) {
+		// [protocol]:<ip>:<port>
+		std::regex addressRegex("((tcp|udp):)?([^:]):([0-9]+)");
+		std::smatch smatch;
+
+		if (std::regex_match(name, smatch, addressRegex)) {
+			result_t result = RESULT_OK;
+			string protocol;
+			string host = smatch[1];
+			string portStr = smatch[2];
+
+			if (smatch.size() == 3) {
+				protocol = smatch[1];
+				host = smatch[2];
+				portStr = smatch[3];
 			}
-			memcpy(&address.sin_addr, h->h_addr_list[0], h->h_length);
+
+			bool udp = (protocol == "udp");
+
+			unsigned int port = parseInt(portStr.c_str(), 10, 1, 65535, result);
+			if (result != RESULT_OK) {
+				return NULL; // invalid port
+			}
+
+			struct sockaddr_in address;
+			memset((char *) &address, 0, sizeof(address));
+			if (inet_aton(host.c_str(), &address.sin_addr) == 0) {
+				struct hostent *h = gethostbyname(host.c_str());
+				if (h == NULL) {
+					return NULL; // invalid host
+				}
+				memcpy(&address.sin_addr, h->h_addr_list[0], h->h_length);
+			}
+			address.sin_family = AF_INET;
+			address.sin_port = (in_port_t) htons((uint16_t) port);
+			return make_shared<NetworkDevice>(name, address, readOnly, initialSend, logRawFunc, udp);
 		}
-		free(in);
-		address.sin_family = AF_INET;
-		address.sin_port = (in_port_t)htons((uint16_t)port);
-		return new NetworkDevice(name, address, readOnly, initialSend, logRawFunc, udp);
 	}
-	return new SerialDevice(name, checkDevice, readOnly, initialSend, logRawFunc);
+	return make_shared<SerialDevice>(name, checkDevice, readOnly, initialSend, logRawFunc);
 }
 
 void Device::close()
@@ -171,7 +176,7 @@ result_t Device::recv(const long timeout, unsigned char& value)
 	if (m_dumpRaw && m_dumpRawStream.is_open()) {
 		m_dumpRawStream.write((char*)&value, 1);
 		m_dumpRawFileSize++;
-		if ((m_dumpRawFileSize%1024) == 0)
+		if ((m_dumpRawFileSize % 1024) == 0)
 			m_dumpRawStream.flush();
 
 		if (m_dumpRawFileSize >= m_dumpRawMaxSize * 1024) {
@@ -224,7 +229,7 @@ result_t SerialDevice::open()
 	struct termios newSettings;
 
 	// open file descriptor
-	m_fd = ::open(m_name, O_RDWR | O_NOCTTY);
+	m_fd = ::open(m_name.c_str(), O_RDWR | O_NOCTTY);
 
 	if (m_fd < 0)
 		return RESULT_ERR_NOTFOUND;
@@ -321,14 +326,7 @@ result_t NetworkDevice::open()
 		unsigned char buf[256];
 		while (::read(m_fd, &buf, 256) > 0);
 	}
-	if (m_bufSize==0) {
-		m_bufSize = MAX_LEN+1;
-		m_buffer = (unsigned char*)malloc(m_bufSize);
-		if (!m_buffer) {
-			m_bufSize = 0;
-		}
-	}
-	m_bufLen = 0;
+
 	if (m_initialSend && write(ESC) != 1) {
 		return RESULT_ERR_SEND;
 	}
@@ -340,38 +338,39 @@ void NetworkDevice::checkDevice()
 	unsigned char value;
 	ssize_t c = ::recv(m_fd, &value, 1, MSG_PEEK | MSG_DONTWAIT);
 	if (c == 0 || (c < 0 && errno != EAGAIN)) {
-		m_bufLen = 0; // flush read buffer
+		m_buffer.clear();
 		close();
 	}
 }
 
-bool NetworkDevice::available()
+bool NetworkDevice::available() const
 {
-	return m_buffer && m_bufLen>0;
+	return not m_buffer.empty();
 }
 
 ssize_t NetworkDevice::write(const unsigned char value)
 {
-	m_bufLen = 0; // flush read buffer
+	m_buffer.clear();
 	return Device::write(value);
 }
 
 ssize_t NetworkDevice::read(unsigned char& value)
 {
 	if (available()) {
-		value = m_buffer[m_bufPos];
-		m_bufPos = (unsigned char)((m_bufPos+1)%m_bufSize);
-		m_bufLen--;
+		value = m_buffer.front();
+		m_buffer.pop_front();
 		return 1;
 	}
-	if (m_bufSize>0) {
-		ssize_t size = ::read(m_fd, m_buffer, m_bufSize);
+
+	if (m_buffer.size() > 0) {
+		std::array<unsigned char, 32> buffer;
+		ssize_t size = ::read(m_fd, &buffer[0], buffer.size());
 		if (size<=0) {
 			return size;
 		}
-		value = m_buffer[0];
-		m_bufPos = 1;
-		m_bufLen = (unsigned char)(size-1);
+		m_buffer.insert(m_buffer.end(), buffer.begin(), buffer.end());
+		value = m_buffer.front();
+		m_buffer.pop_front();
 		return size;
 	}
 	return Device::read(value);

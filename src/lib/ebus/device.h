@@ -23,6 +23,7 @@
 #include <termios.h>
 #include <iostream>
 #include <fstream>
+#include <deque>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include "result.h"
@@ -52,13 +53,14 @@ public:
 	 * @param initialSend whether to send an initial @a ESC symbol in @a open().
 	 * @param logRawFunc the function to call for logging raw data, or NULL.
 	 */
-	Device(const char* name, const bool checkDevice, const bool readOnly, const bool initialSend,
+	Device(const string& name, const bool checkDevice, const bool readOnly, const bool initialSend,
 		void (*logRawFunc)(const unsigned char byte, bool received))
 		: m_name(name)
 		, m_checkDevice(checkDevice)
 		, m_readOnly(readOnly)
 		, m_initialSend(initialSend)
 		, m_logRawFunc(logRawFunc)
+	{}
 
 	/**
 	 * Destructor.
@@ -75,7 +77,7 @@ public:
 	 * @return the new @a Device, or NULL on error.
 	 * Note: the caller needs to free the created instance.
 	 */
-	static Device* create(const char* name, const bool checkDevice=true, const bool readOnly=false, const bool initialSend=false,
+	static shared_ptr<Device> create(const string& name, const bool checkDevice=true, const bool readOnly=false, const bool initialSend=false,
 		void (*logRawFunc)(const unsigned char byte, bool received)=NULL);
 
 	/**
@@ -186,7 +188,7 @@ protected:
 
 protected:
 	/** the device name (e.g. "/dev/ttyUSB0" for serial, "127.0.0.1:1234" for network). */
-	const char* m_name;
+	string m_name;
 
 	/** whether to regularly check the device availability (only for serial devices). */
 	const bool m_checkDevice = false;
@@ -238,7 +240,7 @@ public:
 	 * @param initialSend whether to send an initial @a ESC symbol in @a open().
 	 * @param logRawFunc the function to call for logging raw data, or NULL.
 	 */
-	SerialDevice(const char* name, const bool checkDevice, const bool readOnly, const bool initialSend,
+	SerialDevice(const string& name, const bool checkDevice, const bool readOnly, const bool initialSend,
 		void (*logRawFunc)(const unsigned char byte, bool received))
 		: Device(name, checkDevice, readOnly, initialSend, logRawFunc) {}
 
@@ -273,10 +275,10 @@ public:
 	 * @param logRawFunc the function to call for logging raw data, or NULL.
 	 * @param udp true for UDP, false to TCP.
 	 */
-	NetworkDevice(const char* name, const struct sockaddr_in address, const bool readOnly, const bool initialSend,
+	NetworkDevice(const string& name, const struct sockaddr_in address, const bool readOnly, const bool initialSend,
 		void (*logRawFunc)(const unsigned char byte, bool received), const bool udp)
-		: Device(name, true, readOnly, initialSend, logRawFunc), m_address(address), m_udp(udp),
-		  m_buffer(NULL), m_bufSize(0), m_bufLen(0), m_bufPos(0) {}
+		: Device(name, true, readOnly, initialSend, logRawFunc), m_address(address), m_udp(udp)
+		   {}
 
 	// @copydoc
 	virtual unsigned int getLatency() const override { return 10000; }
@@ -305,17 +307,7 @@ private:
 	const bool m_udp = false;
 
 	/** the buffer memory, or NULL. */
-	unsigned char* m_buffer;
-
-	/** the buffer size. */
-	unsigned char m_bufSize;
-
-	/** the buffer fill length. */
-	unsigned char m_bufLen;
-
-	/** the buffer read position. */
-	unsigned char m_bufPos;
-
+	std::deque<unsigned char> m_buffer;
 };
 
 #endif // LIBEBUS_DEVICE_H_
