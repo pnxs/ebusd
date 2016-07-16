@@ -389,14 +389,13 @@ result_t SingleDataField::create(const char *typeNameStr, const unsigned char le
 								 const PartType partType, int divisor, map<unsigned int, string> values,
 								 shared_ptr<SingleDataField> &returnField)
 {
-	for (size_t i = 0; i < sizeof(dataTypes) / sizeof(dataType_t); i++) {
-		const dataType_t* dataType = &dataTypes[i];
-		if (strcasecmp(typeNameStr, dataType->name) != 0)
+	for (auto& dataType : dataTypes) {
+		if (strcasecmp(typeNameStr, dataType.name) != 0)
 			continue;
 
-		unsigned char bitCount = dataType->bitCount;
+		unsigned char bitCount = dataType.bitCount;
 		unsigned char byteCount = (unsigned char)((bitCount + 7) / 8);
-		if ((dataType->flags & ADJ) != 0) { // adjustable length
+		if (dataType.flags & ADJ) { // adjustable length
 			if ((bitCount % 8) != 0) {
 				if (length == 0)
 					bitCount = 1; // default bit count: 1 bit
@@ -417,7 +416,7 @@ result_t SingleDataField::create(const char *typeNameStr, const unsigned char le
 		else if (length > 0 && length != byteCount)
 			continue; // check for another one with same name but different length
 
-		switch (dataType->type)
+		switch (dataType.type)
 		{
 		case BaseType::str:
 		case BaseType::hexstr:
@@ -425,47 +424,47 @@ result_t SingleDataField::create(const char *typeNameStr, const unsigned char le
 		case BaseType::tim:
 			if (divisor != 0 || !values.empty())
 				return RESULT_ERR_INVALID_ARG; // cannot set divisor or values for string field
-			returnField = make_shared<StringDataField>(name, comment, unit, *dataType, partType, byteCount);
+			returnField = make_shared<StringDataField>(name, comment, unit, dataType, partType, byteCount);
 			return RESULT_OK;
 		case BaseType::num:
-			if (values.empty() && (dataType->flags & DAY) != 0) {
+			if (values.empty() && dataType.flags & DAY) {
 				for (unsigned int i = 0; i < sizeof(dayNames) / sizeof(dayNames[0]); i++)
-					values[dataType->minValue + i] = dayNames[i];
+					values[dataType.minValue + i] = dayNames[i];
 			}
-			if (values.empty() || (dataType->flags & LST) == 0) {
+			if (values.empty() || dataType.flags & LST) {
 				if (divisor == 0)
 					divisor = 1;
 
-				if ((dataType->bitCount % 8) == 0) {
+				if ((dataType.bitCount % 8) == 0) {
 					if (divisor < 0) {
-						if (dataType->divisorOrFirstBit > 1)
+						if (dataType.divisorOrFirstBit > 1)
 							return RESULT_ERR_INVALID_ARG;
 
-						if (dataType->divisorOrFirstBit < 0)
-							divisor *= -dataType->divisorOrFirstBit;
-					} else if (dataType->divisorOrFirstBit < 0) {
+						if (dataType.divisorOrFirstBit < 0)
+							divisor *= -dataType.divisorOrFirstBit;
+					} else if (dataType.divisorOrFirstBit < 0) {
 						if (divisor > 1)
 							return RESULT_ERR_INVALID_ARG;
 
 						if (divisor < 0)
-							divisor *= -dataType->divisorOrFirstBit;
+							divisor *= -dataType.divisorOrFirstBit;
 					} else
-						divisor *= dataType->divisorOrFirstBit;
+						divisor *= dataType.divisorOrFirstBit;
 
 					if (-MAX_DIVISOR > divisor || divisor > MAX_DIVISOR)
 						return RESULT_ERR_OUT_OF_RANGE;
 				}
 
-				returnField = make_shared<NumberDataField>(name, comment, unit, *dataType, partType, byteCount, bitCount, divisor);
+				returnField = make_shared<NumberDataField>(name, comment, unit, dataType, partType, byteCount, bitCount, divisor);
 				return RESULT_OK;
 			}
-			if (values.begin()->first < dataType->minValue || values.rbegin()->first > dataType->maxValue)
+			if (values.begin()->first < dataType.minValue || values.rbegin()->first > dataType.maxValue)
 				return RESULT_ERR_OUT_OF_RANGE;
 
 			if (divisor != 0)
 				return RESULT_ERR_INVALID_ARG; // cannot use divisor != 1 for value list field
 			//TODO add special field for fixed values (exactly one value in the list of values)
-			returnField = make_shared<ValueListDataField>(name, comment, unit, *dataType, partType, byteCount, bitCount, values);
+			returnField = make_shared<ValueListDataField>(name, comment, unit, dataType, partType, byteCount, bitCount, values);
 			return RESULT_OK;
 		}
 	}
@@ -1480,8 +1479,8 @@ result_t DataFieldSet::derive(string name, string comment,
 	if (!values.empty())
 		return RESULT_ERR_INVALID_ARG; // value list not allowed in set derive
 	bool first = true;
-	for (auto it = m_fields.begin(); it < m_fields.end(); it++) {
-		result_t result = (*it)->derive("", first?comment:"", first?unit:"", partType, divisor, values, fields);
+	for (auto& field : m_fields) {
+		result_t result = field->derive("", first?comment:"", first?unit:"", partType, divisor, values, fields);
 		if (result != RESULT_OK)
 			return result;
 		first = false;
