@@ -24,6 +24,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include "clock.h"
+#include "cppconfig.h"
 
 /** the name of each @a LogFacility. */
 static const char *facilityNames[] = {
@@ -56,13 +57,12 @@ static FILE* logFile = stdout;
 
 bool setLogFacilities(const char* facilities)
 {
-	char *input = strdup(facilities);
-	char *opt = (char*)input, *value = NULL;
+	shared_ptr<char> input(strdup(facilities), free);
+	char *opt = input.get(), *value = NULL;
 	int newFacilites = 0;
 	while (*opt) {
 		int val = getsubopt(&opt, (char *const *)facilityNames, &value);
 		if (val < 0 || val > lf_COUNT || value) {
-			free(input);
 			return false;
 		}
 		if (val == lf_COUNT)
@@ -71,7 +71,6 @@ bool setLogFacilities(const char* facilities)
 			newFacilites |= 1<<val;
 	}
 	logFacilites = newFacilites;
-	free(input);
 	return true;
 }
 
@@ -94,19 +93,17 @@ bool getLogFacilities(char* buffer)
 
 bool setLogLevel(const char* level)
 {
-	char *input = strdup(level);
-	char *opt = (char*)input, *value = NULL;
+	shared_ptr<char> input(strdup(level), free);
+	char *opt = input.get(), *value = NULL;
 	int newLevel = 0;
 	if (*opt) {
 		int val = getsubopt(&opt, (char *const *)levelNames, &value);
 		if (val < 0 || val >= ll_COUNT || value || *opt) {
-			free(input);
 			return false;
 		}
 		newLevel = val;
 	}
 	logLevel = (LogLevel)newLevel;
-	free(input);
 	return true;
 }
 
