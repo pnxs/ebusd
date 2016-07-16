@@ -76,19 +76,19 @@ static const unsigned int OF_NUMERIC = 0x02; //!< numeric format (keep numeric v
 static const unsigned int OF_JSON = 0x04;    //!< JSON format.
 
 /** the message part in which a data field is stored. */
-enum PartType {
-	pt_any,          //!< stored in any data (master or slave)
-	pt_masterData,   //!< stored in master data
-	pt_slaveData,    //!< stored in slave data
+enum class PartType {
+	any,          //!< stored in any data (master or slave)
+	masterData,   //!< stored in master data
+	slaveData,    //!< stored in slave data
 };
 
 /** the available base data types. */
-enum BaseType {
-	bt_str,    //!< text string in a @a StringDataField
-	bt_hexstr, //!< hex digit string in a @a StringDataField
-	bt_dat,    //!< date in a @a StringDataField
-	bt_tim,    //!< time in a @a StringDataField
-	bt_num,    //!< numeric value in a @a NumericDataField
+enum class BaseType {
+	str,    //!< text string in a @a StringDataField
+	hexstr, //!< hex digit string in a @a StringDataField
+	dat,    //!< date in a @a StringDataField
+	tim,    //!< time in a @a StringDataField
+	num,    //!< numeric value in a @a NumericDataField
 };
 
 /* flags for dataType_t. */

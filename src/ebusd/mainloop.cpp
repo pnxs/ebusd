@@ -313,7 +313,7 @@ result_t MainLoop::readFromBus(shared_ptr<Message> message, string inputStr, con
 			logError(lf_main, "send message part %d: %s", index, getResultCode(ret));
 			break;
 		}
-		ret = message->storeLastData(pt_slaveData, slave, index);
+		ret = message->storeLastData(PartType::slaveData, slave, index);
 		if (ret < RESULT_OK) {
 			logError(lf_main, "store message part %d: %s", index, getResultCode(ret));
 			break;
@@ -523,7 +523,7 @@ string MainLoop::executeRead(vector<string> &args)
 
 	if (verbose)
 		result << message->getCircuit() << " " << message->getName() << " ";
-	ret = message->decodeLastData(pt_slaveData, result, (verbose?OF_VERBOSE:0)|(numeric?OF_NUMERIC:0), false, fieldIndex==-2 ? NULL : fieldName.c_str(), fieldIndex);
+	ret = message->decodeLastData(PartType::slaveData, result, (verbose?OF_VERBOSE:0)|(numeric?OF_NUMERIC:0), false, fieldIndex==-2 ? NULL : fieldName.c_str(), fieldIndex);
 	if (ret < RESULT_OK) {
 		logError(lf_main, "read %s %s: decode %s", message->getCircuit().c_str(), message->getName().c_str(), getResultCode(ret));
 		result.str("");
@@ -651,7 +651,7 @@ string MainLoop::executeWrite(vector<string> &args)
 		return getResultCode(RESULT_OK);
 	}
 
-	ret = message->decodeLastData(pt_slaveData, result); // decode data
+	ret = message->decodeLastData(PartType::slaveData, result); // decode data
 	if (ret >= RESULT_OK && result.str().empty()) {
 		logInfo(lf_main, "write %s %s: decode %s", message->getCircuit().c_str(), message->getName().c_str(), getResultCode(ret));
 		return getResultCode(RESULT_OK);

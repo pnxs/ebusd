@@ -34,72 +34,72 @@ using std::setprecision;
 using std::fixed;
 
 static const dataType_t stringDataType = {
-	"STR",MAX_LEN*8,bt_str, ADJ,        ' ',          1,          0,    0  // >= 1 byte character string filled up with space
+	"STR",MAX_LEN*8, BaseType::str, ADJ,        ' ',          1,          0,    0  // >= 1 byte character string filled up with space
 };
 
 static const dataType_t pinDataType = {
-	"PIN", 16, bt_num, FIX|BCD|REV,  0xffff,          0,     0x9999,    1 // unsigned decimal in BCD, 0000 - 9999 (fixed length)
+	"PIN", 16, BaseType::num, FIX|BCD|REV,  0xffff,          0,     0x9999,    1 // unsigned decimal in BCD, 0000 - 9999 (fixed length)
 };
 
 static const dataType_t uchDataType = {
-	"UCH",  8, bt_num,     LST,        0xff,          0,       0xfe,    1 // unsigned integer, 0 - 254
+	"UCH",  8, BaseType::num,     LST,        0xff,          0,       0xfe,    1 // unsigned integer, 0 - 254
 };
 
 /** the known data field types. */
-static const dataType_t dataTypes[] = {
-	{"IGN",MAX_LEN*8,bt_str, IGN|ADJ,     0,          1,          0,    0}, // >= 1 byte ignored data
+static const vector<dataType_t> dataTypes = {
+	{"IGN",MAX_LEN*8,BaseType::str, IGN|ADJ,     0,          1,          0,    0}, // >= 1 byte ignored data
 	stringDataType,
-	{"NTS",MAX_LEN*8,bt_str, ADJ,         0,          1,          0,    0}, // >= 1 byte character string filled up with 0x00 (null terminated string)
-	{"HEX",MAX_LEN*8,bt_hexstr,  ADJ,     0,          2,         47,    0}, // >= 1 byte hex digit string, usually separated by space, e.g. 0a 1b 2c 3d
-	{"BDA", 32, bt_dat,     BCD,       0xff,         10,         10,    0}, // date with weekday in BCD, 01.01.2000 - 31.12.2099 (0x01,0x01,WW,0x00 - 0x31,0x12,WW,0x99, WW is weekday Mon=0x00 - Sun=0x06, replacement 0xff)
-	{"BDA", 24, bt_dat,     BCD,       0xff,         10,         10,    0}, // date in BCD, 01.01.2000 - 31.12.2099 (0x01,0x01,0x00 - 0x31,0x12,0x99, replacement 0xff)
-	{"HDA", 32, bt_dat,       0,       0xff,         10,         10,    0}, // date with weekday, 01.01.2000 - 31.12.2099 (0x01,0x01,WW,0x00 - 0x1f,0x0c,WW,0x63, WW is weekday Mon=0x01 - Sun=0x07, replacement 0xff)
-	{"HDA", 24, bt_dat,       0,       0xff,         10,         10,    0}, // date, 01.01.2000 - 31.12.2099 (0x01,0x01,0x00 - 0x1f,0x0c,0x63, replacement 0xff)
-	{"BTI", 24, bt_tim, BCD|REV|REQ,      0,          8,          8,    0}, // time in BCD, 00:00:00 - 23:59:59 (0x00,0x00,0x00 - 0x59,0x59,0x23)
-	{"HTI", 24, bt_tim,     REQ,          0,          8,          8,    0}, // time, 00:00:00 - 23:59:59 (0x00,0x00,0x00 - 0x17,0x3b,0x3b)
-	{"VTI", 24, bt_tim,     REV,       0x63,          8,          8,    0}, // time, 00:00:00 - 23:59:59 (0x00,0x00,0x00 - 0x3b,0x3b,0x17, replacement 0x63) [Vaillant type]
-	{"BTM", 16, bt_tim, BCD|REV,       0xff,          5,          5,    0}, // time as hh:mm in BCD, 00:00 - 23:59 (0x00,0x00 - 0x59,0x23, replacement 0xff)
-	{"HTM", 16, bt_tim,     REQ,          0,          5,          5,    0}, // time as hh:mm, 00:00 - 23:59 (0x00,0x00 - 0x17,0x3b)
-	{"VTM", 16, bt_tim,     REV,       0xff,          5,          5,    0}, // time as hh:mm, 00:00 - 23:59 (0x00,0x00 - 0x3b,0x17, replacement 0xff) [Vaillant type]
-	{"TTM",  8, bt_tim,       0,       0x90,          5,          5,   10}, // truncated time (only multiple of 10 minutes), 00:00 - 24:00 (minutes div 10 + hour * 6 as integer)
-	{"TTH",  8, bt_tim,       0,          0,          5,          5,   30}, // truncated time (only multiple of 30 minutes), 00:30 - 24:00 (minutes div 30 + hour * 2 as integer)
-	{"BDY",  8, bt_num, DAY|LST,       0x07,          0,          6,    1}, // weekday, "Mon" - "Sun" (0x00 - 0x06) [eBUS type]
-	{"HDY",  8, bt_num, DAY|LST,       0x00,          1,          7,    1}, // weekday, "Mon" - "Sun" (0x01 - 0x07) [Vaillant type]
-	{"BCD",  8, bt_num, BCD|LST,       0xff,          0,         99,    1}, // unsigned decimal in BCD, 0 - 99
-	{"BCD", 16, bt_num, BCD|LST,     0xffff,          0,       9999,    1}, // unsigned decimal in BCD, 0 - 9999
-	{"BCD", 24, bt_num, BCD|LST,   0xffffff,          0,     999999,    1}, // unsigned decimal in BCD, 0 - 999999
-	{"BCD", 32, bt_num, BCD|LST, 0xffffffff,          0,   99999999,    1}, // unsigned decimal in BCD, 0 - 99999999
-	{"HCD", 32, bt_num, HCD|BCD|REQ,      0,          0,   99999999,    1}, // unsigned decimal in HCD, 0 - 99999999
-	{"HCD",  8, bt_num, HCD|BCD|REQ,      0,          0,         99,    1}, // unsigned decimal in HCD, 0 - 99
-	{"HCD", 16, bt_num, HCD|BCD|REQ,      0,          0,       9999,    1}, // unsigned decimal in HCD, 0 - 9999
-	{"HCD", 24, bt_num, HCD|BCD|REQ,      0,          0,     999999,    1}, // unsigned decimal in HCD, 0 - 999999
+	{"NTS",MAX_LEN*8,BaseType::str, ADJ,         0,          1,          0,    0}, // >= 1 byte character string filled up with 0x00 (null terminated string)
+	{"HEX",MAX_LEN*8,BaseType::hexstr,  ADJ,     0,          2,         47,    0}, // >= 1 byte hex digit string, usually separated by space, e.g. 0a 1b 2c 3d
+	{"BDA", 32, BaseType::dat,     BCD,       0xff,         10,         10,    0}, // date with weekday in BCD, 01.01.2000 - 31.12.2099 (0x01,0x01,WW,0x00 - 0x31,0x12,WW,0x99, WW is weekday Mon=0x00 - Sun=0x06, replacement 0xff)
+	{"BDA", 24, BaseType::dat,     BCD,       0xff,         10,         10,    0}, // date in BCD, 01.01.2000 - 31.12.2099 (0x01,0x01,0x00 - 0x31,0x12,0x99, replacement 0xff)
+	{"HDA", 32, BaseType::dat,       0,       0xff,         10,         10,    0}, // date with weekday, 01.01.2000 - 31.12.2099 (0x01,0x01,WW,0x00 - 0x1f,0x0c,WW,0x63, WW is weekday Mon=0x01 - Sun=0x07, replacement 0xff)
+	{"HDA", 24, BaseType::dat,       0,       0xff,         10,         10,    0}, // date, 01.01.2000 - 31.12.2099 (0x01,0x01,0x00 - 0x1f,0x0c,0x63, replacement 0xff)
+	{"BTI", 24, BaseType::tim, BCD|REV|REQ,      0,          8,          8,    0}, // time in BCD, 00:00:00 - 23:59:59 (0x00,0x00,0x00 - 0x59,0x59,0x23)
+	{"HTI", 24, BaseType::tim,     REQ,          0,          8,          8,    0}, // time, 00:00:00 - 23:59:59 (0x00,0x00,0x00 - 0x17,0x3b,0x3b)
+	{"VTI", 24, BaseType::tim,     REV,       0x63,          8,          8,    0}, // time, 00:00:00 - 23:59:59 (0x00,0x00,0x00 - 0x3b,0x3b,0x17, replacement 0x63) [Vaillant type]
+	{"BTM", 16, BaseType::tim, BCD|REV,       0xff,          5,          5,    0}, // time as hh:mm in BCD, 00:00 - 23:59 (0x00,0x00 - 0x59,0x23, replacement 0xff)
+	{"HTM", 16, BaseType::tim,     REQ,          0,          5,          5,    0}, // time as hh:mm, 00:00 - 23:59 (0x00,0x00 - 0x17,0x3b)
+	{"VTM", 16, BaseType::tim,     REV,       0xff,          5,          5,    0}, // time as hh:mm, 00:00 - 23:59 (0x00,0x00 - 0x3b,0x17, replacement 0xff) [Vaillant type]
+	{"TTM",  8, BaseType::tim,       0,       0x90,          5,          5,   10}, // truncated time (only multiple of 10 minutes), 00:00 - 24:00 (minutes div 10 + hour * 6 as integer)
+	{"TTH",  8, BaseType::tim,       0,          0,          5,          5,   30}, // truncated time (only multiple of 30 minutes), 00:30 - 24:00 (minutes div 30 + hour * 2 as integer)
+	{"BDY",  8, BaseType::num, DAY|LST,       0x07,          0,          6,    1}, // weekday, "Mon" - "Sun" (0x00 - 0x06) [eBUS type]
+	{"HDY",  8, BaseType::num, DAY|LST,       0x00,          1,          7,    1}, // weekday, "Mon" - "Sun" (0x01 - 0x07) [Vaillant type]
+	{"BCD",  8, BaseType::num, BCD|LST,       0xff,          0,         99,    1}, // unsigned decimal in BCD, 0 - 99
+	{"BCD", 16, BaseType::num, BCD|LST,     0xffff,          0,       9999,    1}, // unsigned decimal in BCD, 0 - 9999
+	{"BCD", 24, BaseType::num, BCD|LST,   0xffffff,          0,     999999,    1}, // unsigned decimal in BCD, 0 - 999999
+	{"BCD", 32, BaseType::num, BCD|LST, 0xffffffff,          0,   99999999,    1}, // unsigned decimal in BCD, 0 - 99999999
+	{"HCD", 32, BaseType::num, HCD|BCD|REQ,      0,          0,   99999999,    1}, // unsigned decimal in HCD, 0 - 99999999
+	{"HCD",  8, BaseType::num, HCD|BCD|REQ,      0,          0,         99,    1}, // unsigned decimal in HCD, 0 - 99
+	{"HCD", 16, BaseType::num, HCD|BCD|REQ,      0,          0,       9999,    1}, // unsigned decimal in HCD, 0 - 9999
+	{"HCD", 24, BaseType::num, HCD|BCD|REQ,      0,          0,     999999,    1}, // unsigned decimal in HCD, 0 - 999999
 	pinDataType,
 	uchDataType,
-	{"SCH",  8, bt_num,     SIG,       0x80,       0x81,       0x7f,    1}, // signed integer, -127 - +127
-	{"D1B",  8, bt_num,     SIG,       0x80,       0x81,       0x7f,    1}, // signed integer, -127 - +127
-	{"D1C",  8, bt_num,       0,       0xff,       0x00,       0xc8,    2}, // unsigned number (fraction 1/2), 0 - 100 (0x00 - 0xc8, replacement 0xff)
-	{"D2B", 16, bt_num,     SIG,     0x8000,     0x8001,     0x7fff,  256}, // signed number (fraction 1/256), -127.99 - +127.99
-	{"D2C", 16, bt_num,     SIG,     0x8000,     0x8001,     0x7fff,   16}, // signed number (fraction 1/16), -2047.9 - +2047.9
-	{"FLT", 16, bt_num,     SIG,     0x8000,     0x8001,     0x7fff, 1000}, // signed number (fraction 1/1000), -32.767 - +32.767, little endian
-	{"FLR", 16, bt_num, SIG|REV,     0x8000,     0x8001,     0x7fff, 1000}, // signed number (fraction 1/1000), -32.767 - +32.767, big endian
-	{"EXP", 32, bt_num, SIG|EXP, 0x7f800000, 0x00000000, 0xffffffff,    1}, // signed number (IEEE 754 binary32: 1 bit sign, 8 bits exponent, 23 bits significand), little endian
-	{"EXR", 32, bt_num, SIG|EXP|REV,0x7f800000,0x00000000,0xffffffff,   1}, // signed number (IEEE 754 binary32: 1 bit sign, 8 bits exponent, 23 bits significand), big endian
-	{"UIN", 16, bt_num,     LST,     0xffff,          0,     0xfffe,    1}, // unsigned integer, 0 - 65534, little endian
-	{"UIR", 16, bt_num, LST|REV,     0xffff,          0,     0xfffe,    1}, // unsigned integer, 0 - 65534, big endian
-	{"SIN", 16, bt_num,     SIG,     0x8000,     0x8001,     0x7fff,    1}, // signed integer, -32767 - +32767, little endian
-	{"SIR", 16, bt_num, SIG|REV,     0x8000,     0x8001,     0x7fff,    1}, // signed integer, -32767 - +32767, big endian
-	{"ULG", 32, bt_num,     LST, 0xffffffff,          0, 0xfffffffe,    1}, // unsigned integer, 0 - 4294967294, little endian
-	{"ULR", 32, bt_num, LST|REV, 0xffffffff,          0, 0xfffffffe,    1}, // unsigned integer, 0 - 4294967294, big endian
-	{"SLG", 32, bt_num,     SIG, 0x80000000, 0x80000001, 0xffffffff,    1}, // signed integer, -2147483647 - +2147483647, little endian
-	{"SLR", 32, bt_num, SIG|REV, 0x80000000, 0x80000001, 0xffffffff,    1}, // signed integer, -2147483647 - +2147483647, big endian
-	{"BI0",  7, bt_num, ADJ|LST|REQ,      0,          0,       0xef,    0}, // bit 0 (up to 7 bits until bit 6)
-	{"BI1",  7, bt_num, ADJ|LST|REQ,      0,          0,       0x7f,    1}, // bit 1 (up to 7 bits until bit 7)
-	{"BI2",  6, bt_num, ADJ|LST|REQ,      0,          0,       0x3f,    2}, // bit 2 (up to 6 bits until bit 7)
-	{"BI3",  5, bt_num, ADJ|LST|REQ,      0,          0,       0x1f,    3}, // bit 3 (up to 5 bits until bit 7)
-	{"BI4",  4, bt_num, ADJ|LST|REQ,      0,          0,       0x0f,    4}, // bit 4 (up to 4 bits until bit 7)
-	{"BI5",  3, bt_num, ADJ|LST|REQ,      0,          0,       0x07,    5}, // bit 5 (up to 3 bits until bit 7)
-	{"BI6",  2, bt_num, ADJ|LST|REQ,      0,          0,       0x03,    6}, // bit 6 (up to 2 bits until bit 7)
-	{"BI7",  1, bt_num, ADJ|LST|REQ,      0,          0,       0x01,    7}, // bit 7
+	{"SCH",  8, BaseType::num,     SIG,       0x80,       0x81,       0x7f,    1}, // signed integer, -127 - +127
+	{"D1B",  8, BaseType::num,     SIG,       0x80,       0x81,       0x7f,    1}, // signed integer, -127 - +127
+	{"D1C",  8, BaseType::num,       0,       0xff,       0x00,       0xc8,    2}, // unsigned number (fraction 1/2), 0 - 100 (0x00 - 0xc8, replacement 0xff)
+	{"D2B", 16, BaseType::num,     SIG,     0x8000,     0x8001,     0x7fff,  256}, // signed number (fraction 1/256), -127.99 - +127.99
+	{"D2C", 16, BaseType::num,     SIG,     0x8000,     0x8001,     0x7fff,   16}, // signed number (fraction 1/16), -2047.9 - +2047.9
+	{"FLT", 16, BaseType::num,     SIG,     0x8000,     0x8001,     0x7fff, 1000}, // signed number (fraction 1/1000), -32.767 - +32.767, little endian
+	{"FLR", 16, BaseType::num, SIG|REV,     0x8000,     0x8001,     0x7fff, 1000}, // signed number (fraction 1/1000), -32.767 - +32.767, big endian
+	{"EXP", 32, BaseType::num, SIG|EXP, 0x7f800000, 0x00000000, 0xffffffff,    1}, // signed number (IEEE 754 binary32: 1 bit sign, 8 bits exponent, 23 bits significand), little endian
+	{"EXR", 32, BaseType::num, SIG|EXP|REV,0x7f800000,0x00000000,0xffffffff,   1}, // signed number (IEEE 754 binary32: 1 bit sign, 8 bits exponent, 23 bits significand), big endian
+	{"UIN", 16, BaseType::num,     LST,     0xffff,          0,     0xfffe,    1}, // unsigned integer, 0 - 65534, little endian
+	{"UIR", 16, BaseType::num, LST|REV,     0xffff,          0,     0xfffe,    1}, // unsigned integer, 0 - 65534, big endian
+	{"SIN", 16, BaseType::num,     SIG,     0x8000,     0x8001,     0x7fff,    1}, // signed integer, -32767 - +32767, little endian
+	{"SIR", 16, BaseType::num, SIG|REV,     0x8000,     0x8001,     0x7fff,    1}, // signed integer, -32767 - +32767, big endian
+	{"ULG", 32, BaseType::num,     LST, 0xffffffff,          0, 0xfffffffe,    1}, // unsigned integer, 0 - 4294967294, little endian
+	{"ULR", 32, BaseType::num, LST|REV, 0xffffffff,          0, 0xfffffffe,    1}, // unsigned integer, 0 - 4294967294, big endian
+	{"SLG", 32, BaseType::num,     SIG, 0x80000000, 0x80000001, 0xffffffff,    1}, // signed integer, -2147483647 - +2147483647, little endian
+	{"SLR", 32, BaseType::num, SIG|REV, 0x80000000, 0x80000001, 0xffffffff,    1}, // signed integer, -2147483647 - +2147483647, big endian
+	{"BI0",  7, BaseType::num, ADJ|LST|REQ,      0,          0,       0xef,    0}, // bit 0 (up to 7 bits until bit 6)
+	{"BI1",  7, BaseType::num, ADJ|LST|REQ,      0,          0,       0x7f,    1}, // bit 1 (up to 7 bits until bit 7)
+	{"BI2",  6, BaseType::num, ADJ|LST|REQ,      0,          0,       0x3f,    2}, // bit 2 (up to 6 bits until bit 7)
+	{"BI3",  5, BaseType::num, ADJ|LST|REQ,      0,          0,       0x1f,    3}, // bit 3 (up to 5 bits until bit 7)
+	{"BI4",  4, BaseType::num, ADJ|LST|REQ,      0,          0,       0x0f,    4}, // bit 4 (up to 4 bits until bit 7)
+	{"BI5",  3, BaseType::num, ADJ|LST|REQ,      0,          0,       0x07,    5}, // bit 5 (up to 3 bits until bit 7)
+	{"BI6",  2, BaseType::num, ADJ|LST|REQ,      0,          0,       0x03,    6}, // bit 6 (up to 2 bits until bit 7)
+	{"BI7",  1, BaseType::num, ADJ|LST|REQ,      0,          0,       0x01,    7}, // bit 7
 };
 
 /** the maximum divisor value. */
@@ -230,7 +230,7 @@ result_t DataField::create(vector<string>::iterator &it,
 		}
 
 		if (isTemplate)
-			partType = pt_any;
+			partType = PartType::any;
 		else {
 			const char* partStr = (*it++).c_str(); // part
 			hasPartStr = partStr[0] != 0;
@@ -242,11 +242,11 @@ result_t DataField::create(vector<string>::iterator &it,
 			if (isBroadcastOrMasterDestination
 				|| (isWriteMessage && !hasPartStr)
 				|| strcasecmp(partStr, "M") == 0) { // master data
-				partType = pt_masterData;
+				partType = PartType::masterData;
 			}
 			else if ((!isWriteMessage && !hasPartStr)
 				|| strcasecmp(partStr, "S") == 0) { // slave data
-				partType = pt_slaveData;
+				partType = PartType::slaveData;
 			}
 			else {
 				result = RESULT_ERR_INVALID_PART;
@@ -419,15 +419,15 @@ result_t SingleDataField::create(const char *typeNameStr, const unsigned char le
 
 		switch (dataType->type)
 		{
-		case bt_str:
-		case bt_hexstr:
-		case bt_dat:
-		case bt_tim:
+		case BaseType::str:
+		case BaseType::hexstr:
+		case BaseType::dat:
+		case BaseType::tim:
 			if (divisor != 0 || !values.empty())
 				return RESULT_ERR_INVALID_ARG; // cannot set divisor or values for string field
 			returnField = make_shared<StringDataField>(name, comment, unit, *dataType, partType, byteCount);
 			return RESULT_OK;
-		case bt_num:
+		case BaseType::num:
 			if (values.empty() && (dataType->flags & DAY) != 0) {
 				for (unsigned int i = 0; i < sizeof(dayNames) / sizeof(dayNames[0]); i++)
 					values[dataType->minValue + i] = dayNames[i];
@@ -477,9 +477,9 @@ void SingleDataField::dump(ostream& output)
 	output << setw(0) << dec; // initialize formatting
 	dumpString(output, m_name, false);
 	output << FIELD_SEPARATOR;
-	if (m_partType == pt_masterData)
+	if (m_partType == PartType::masterData)
 		output << "m";
-	else if (m_partType == pt_slaveData)
+	else if (m_partType == PartType::slaveData)
 		output << "s";
 	dumpString(output, m_dataType.name);
 }
@@ -494,13 +494,13 @@ result_t SingleDataField::read(const PartType partType,
 
 	switch (m_partType)
 	{
-	case pt_masterData:
+	case PartType::masterData:
 		offset = (unsigned char)(offset + 5); // skip QQ ZZ PB SB NN
 		break;
-	case pt_slaveData:
+	case PartType::slaveData:
 		offset++; // skip NN
 		break;
-	default:
+        case PartType::any:
 		return RESULT_ERR_INVALID_PART;
 	}
 	if (isIgnored() || (fieldName != NULL && (m_name != fieldName || fieldIndex > 0))) {
@@ -523,13 +523,13 @@ result_t SingleDataField::read(const PartType partType,
 
 	switch (m_partType)
 	{
-	case pt_masterData:
+	case PartType::masterData:
 		offset = (unsigned char)(offset + 5); // skip QQ ZZ PB SB NN
 		break;
-	case pt_slaveData:
+	case PartType::slaveData:
 		offset++; // skip NN
 		break;
-	default:
+	case PartType::any:
 		return RESULT_ERR_INVALID_PART;
 	}
 	if (isIgnored() || (fieldName != NULL && (m_name != fieldName || fieldIndex > 0))) {
@@ -586,13 +586,13 @@ result_t SingleDataField::write(istringstream& input,
 
 	switch (m_partType)
 	{
-	case pt_masterData:
+	case PartType::masterData:
 		offset = (unsigned char)(offset + 5); // skip QQ ZZ PB SB NN
 		break;
-	case pt_slaveData:
+	case PartType::slaveData:
 		offset++; // skip NN
 		break;
-	default:
+	case PartType::any:
 		return RESULT_ERR_INVALID_PART;
 	}
 	return writeSymbols(input, offset, data, length);
@@ -608,7 +608,7 @@ result_t StringDataField::derive(string name, string comment,
 								 int divisor, map<unsigned int, string> values,
 								 vector<shared_ptr<SingleDataField>> &fields)
 {
-	if (m_partType != pt_any && partType == pt_any)
+	if (m_partType != PartType::any && partType == PartType::any)
 		return RESULT_ERR_INVALID_PART; // cannot create a template from a concrete instance
 	if (divisor != 0 || !values.empty())
 		return RESULT_ERR_INVALID_ARG; // cannot set divisor or values for string field
@@ -668,7 +668,7 @@ result_t StringDataField::readSymbols(SymbolString& input, const unsigned char b
 	if (outputFormat & OF_JSON)
 		output << '"';
 	for (size_t offset = start, i = 0; i < count; offset += incr, i++) {
-		if (m_length == 4 && i == 2 && m_dataType.type == bt_dat)
+		if (m_length == 4 && i == 2 && m_dataType.type == BaseType::dat)
 			continue; // skip weekday in between
 		ch = input[baseOffset + offset];
 		if ((m_dataType.flags & BCD) != 0 && ((m_dataType.flags & REQ) != 0 || ch != m_dataType.replacement)) {
@@ -678,12 +678,12 @@ result_t StringDataField::readSymbols(SymbolString& input, const unsigned char b
 		}
 		switch (m_dataType.type)
 		{
-		case bt_hexstr:
+		case BaseType::hexstr:
 			if (i > 0)
 				output << ' ';
 			output << setw(2) << hex << setfill('0') << static_cast<unsigned>(ch);
 			break;
-		case bt_dat:
+		case BaseType::dat:
 			if ((m_dataType.flags & REQ) == 0 && ch == m_dataType.replacement) {
 				if (i + 1 != m_length) {
 					output << NULL_VALUE << ".";
@@ -701,7 +701,7 @@ result_t StringDataField::readSymbols(SymbolString& input, const unsigned char b
 			else
 				output << setw(2) << dec << setfill('0') << static_cast<unsigned>(ch) << ".";
 			break;
-		case bt_tim:
+		case BaseType::tim:
 			if ((m_dataType.flags & REQ) == 0 && ch == m_dataType.replacement) {
 				if (m_length == 1) { // truncated time
 					output << NULL_VALUE << ":" << NULL_VALUE;
@@ -778,7 +778,7 @@ result_t StringDataField::writeSymbols(istringstream& input,
 	for (offset = start; i < count; offset += incr, i++) {
 		switch (m_dataType.type)
 		{
-		case bt_hexstr:
+		case BaseType::hexstr:
 			while (!input.eof() && input.peek() == ' ')
 				input.get();
 			if (input.eof()) { // no more digits
@@ -797,7 +797,7 @@ result_t StringDataField::writeSymbols(istringstream& input,
 					return result; // invalid hex value
 			}
 			break;
-		case bt_dat:
+		case BaseType::dat:
 			if (m_length == 4 && i == 2)
 				continue; // skip weekday in between
 			if (input.eof() || !getline(input, token, '.'))
@@ -830,7 +830,7 @@ result_t StringDataField::writeSymbols(istringstream& input,
 			else if (value < 1 || (i == 0 && value > 31) || (i == 1 && value > 12))
 				return RESULT_ERR_OUT_OF_RANGE; // invalid date part
 			break;
-		case bt_tim:
+		case BaseType::tim:
 			if (input.eof() || !getline(input, token, LENGTH_SEPARATOR))
 				return RESULT_ERR_EOF; // incomplete
 			if ((m_dataType.flags & REQ) == 0 && strcmp(token.c_str(), NULL_VALUE) == 0) {
@@ -878,7 +878,7 @@ result_t StringDataField::writeSymbols(istringstream& input,
 			break;
 		}
 		if (remainder && input.eof() && i > 0) {
-			if (value == 0x00 && m_dataType.type == bt_str) {
+			if (value == 0x00 && m_dataType.type == BaseType::str) {
 				output[baseOffset + offset] = 0;
 				offset += incr;
 			}
@@ -1042,7 +1042,7 @@ result_t NumberDataField::derive(string name, string comment,
 								 int divisor, map<unsigned int, string> values,
 								 vector<shared_ptr<SingleDataField>> &fields)
 {
-	if (m_partType != pt_any && partType == pt_any)
+	if (m_partType != PartType::any && partType == PartType::any)
 		return RESULT_ERR_INVALID_PART; // cannot create a template from a concrete instance
 	if (name.empty())
 		name = m_name;
@@ -1299,7 +1299,7 @@ result_t ValueListDataField::derive(string name, string comment,
 									int divisor, map<unsigned int, string> values,
 									vector<shared_ptr<SingleDataField>> &fields)
 {
-	if (m_partType != pt_any && partType == pt_any)
+	if (m_partType != PartType::any && partType == PartType::any)
 		return RESULT_ERR_INVALID_PART; // cannot create a template from a concrete instance
 	if (name.empty())
 		name = m_name;
@@ -1425,10 +1425,10 @@ shared_ptr<DataFieldSet> DataFieldSet::getIdentFields()
 		manufacturers[0xc5] = "Weishaupt";
 		manufacturers[0xfd] = "ebusd.eu";
 		vector<shared_ptr<SingleDataField>> fields;
-		fields.push_back(make_shared<ValueListDataField>("MF", "", "", uchDataType, pt_slaveData, 1, 8, manufacturers));
-		fields.push_back(make_shared<StringDataField>("ID", "", "", stringDataType, pt_slaveData, 5));
-		fields.push_back(make_shared<NumberDataField>("SW", "", "", pinDataType, pt_slaveData, 2, 16, 1));
-		fields.push_back(make_shared<NumberDataField>("HW", "", "", pinDataType, pt_slaveData, 2, 16, 1));
+		fields.push_back(make_shared<ValueListDataField>("MF", "", "", uchDataType, PartType::slaveData, 1, 8, manufacturers));
+		fields.push_back(make_shared<StringDataField>("ID", "", "", stringDataType, PartType::slaveData, 5));
+		fields.push_back(make_shared<NumberDataField>("SW", "", "", pinDataType, PartType::slaveData, 2, 16, 1));
+		fields.push_back(make_shared<NumberDataField>("HW", "", "", pinDataType, PartType::slaveData, 2, 16, 1));
 		s_identFields = make_shared<DataFieldSet>("ident", "", fields);
 	}
 	return s_identFields;
@@ -1517,7 +1517,7 @@ result_t DataFieldSet::read(const PartType partType,
 {
 	bool previousFullByteOffset = true, found = false, findFieldIndex = fieldName != NULL && fieldIndex >= 0;
 	for (auto& field : m_fields) {
-		if (partType != pt_any && field->getPartType() != partType)
+		if (partType != PartType::any && field->getPartType() != partType)
 			continue;
 
 		if (!previousFullByteOffset && !field->hasFullByteOffset(false))
@@ -1559,7 +1559,7 @@ result_t DataFieldSet::read(const PartType partType,
 	if (!m_uniqueNames && outputIndex<0)
 		outputIndex = 0;
 	for (auto& field : m_fields) {
-		if (partType != pt_any && field->getPartType() != partType) {
+		if (partType != PartType::any && field->getPartType() != partType) {
 			if (outputIndex>=0 && !field->isIgnored())
 				outputIndex++;
 			continue;
@@ -1608,11 +1608,11 @@ result_t DataFieldSet::write(istringstream& input,
 		unsigned char offset, char separator, unsigned char* length)
 {
 	string token;
-
 	bool previousFullByteOffset = true;
 	unsigned char baseOffset = offset;
+
 	for (auto& field : m_fields) {
-		if (partType != pt_any && field->getPartType() != partType)
+		if (partType != PartType::any && field->getPartType() != partType)
 			continue;
 
 		if (!previousFullByteOffset && !field->hasFullByteOffset(false))

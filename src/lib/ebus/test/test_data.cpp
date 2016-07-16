@@ -475,9 +475,9 @@ int main()
 			cout << "  parse \"" << sstr.getDataStr(true, false).substr(0, 2) << "\" error: " << getResultCode(result) << endl;
 			error = true;
 		}
-		result = fields->read(pt_masterData, mstr, 0, output, (verbose?OF_VERBOSE:0)|(numeric?OF_NUMERIC:0)|(json?OF_JSON:0), -1, false);
+		result = fields->read(PartType::masterData, mstr, 0, output, (verbose?OF_VERBOSE:0)|(numeric?OF_NUMERIC:0)|(json?OF_JSON:0), -1, false);
 		if (result >= RESULT_OK) {
-			result = fields->read(pt_slaveData, sstr, 0, output, (verbose?OF_VERBOSE:0)|(numeric?OF_NUMERIC:0)|(json?OF_JSON:0), -1, !output.str().empty());
+			result = fields->read(PartType::slaveData, sstr, 0, output, (verbose?OF_VERBOSE:0)|(numeric?OF_NUMERIC:0)|(json?OF_JSON:0), -1, !output.str().empty());
 		}
 		if (failedRead)
 			if (result >= RESULT_OK) {
@@ -500,9 +500,9 @@ int main()
 
 		if (!verbose && !json) {
 			istringstream input(expectStr);
-			result = fields->write(input, pt_masterData, writeMstr, 0);
+			result = fields->write(input, PartType::masterData, writeMstr, 0);
 			if (result >= RESULT_OK)
-				result = fields->write(input, pt_slaveData, writeSstr, 0);
+				result = fields->write(input, PartType::slaveData, writeSstr, 0);
 			if (failedWrite) {
 				if (result >= RESULT_OK) {
 					cout << "  failed write " << fields->getName() << " >"

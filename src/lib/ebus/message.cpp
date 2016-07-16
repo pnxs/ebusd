@@ -353,7 +353,7 @@ result_t Message::create(vector<string>::iterator& it, const vector<string>::ite
 			return result;
 		}
 	}
-	if (id.size() + data->getLength(pt_masterData, (unsigned char)maxLength) > 2 + maxLength || data->getLength(pt_slaveData, (unsigned char)maxLength) > maxLength) {
+	if (id.size() + data->getLength(PartType::masterData, (unsigned char)maxLength) > 2 + maxLength || data->getLength(PartType::slaveData, (unsigned char)maxLength) > maxLength) {
 		// max NN exceeded
 		return RESULT_ERR_INVALID_POS;
 	}
@@ -496,7 +496,7 @@ result_t Message::prepareMaster(const unsigned char srcAddress, SymbolString& ma
 	result = prepareMasterPart(master, input, separator, index);
 	if (result != RESULT_OK)
 		return result;
-	result = storeLastData(pt_masterData, master, index);
+	result = storeLastData(PartType::masterData, master, index);
 	if (result < RESULT_OK)
 		return result;
 	masterData.clear();
@@ -517,7 +517,7 @@ result_t Message::prepareMasterPart(SymbolString& master, istringstream& input, 
 		if (result != RESULT_OK)
 			return result;
 	}
-	result = m_data->write(input, pt_masterData, master, getIdLength(), separator);
+	result = m_data->write(input, PartType::masterData, master, getIdLength(), separator);
 	if (result != RESULT_OK)
 		return result;
 	master[pos] = (unsigned char)(master.size()-pos-1);
@@ -533,7 +533,7 @@ result_t Message::prepareSlave(istringstream& input, SymbolString& slaveData)
 	result_t result = slave.push_back(0, false, false); // length, will be set later
 	if (result != RESULT_OK)
 		return result;
-	result = m_data->write(input, pt_slaveData, slave, 0);
+	result = m_data->write(input, PartType::slaveData, slave, 0);
 	if (result != RESULT_OK)
 		return result;
 	slave[0] = (unsigned char)(slave.size()-1);
@@ -549,16 +549,16 @@ result_t Message::prepareSlave(istringstream& input, SymbolString& slaveData)
 
 result_t Message::storeLastData(SymbolString& master, SymbolString& slave)
 {
-	result_t result = storeLastData(pt_masterData, master, 0);
+	result_t result = storeLastData(PartType::masterData, master, 0);
 	if (result>=RESULT_OK)
-		result = storeLastData(pt_slaveData, slave, 0);
+		result = storeLastData(PartType::slaveData, slave, 0);
 	return result;
 }
 
 result_t Message::storeLastData(const PartType partType, SymbolString& data, unsigned char index)
 {
 	time(&m_lastUpdateTime);
-	if (partType == pt_masterData) {
+	if (partType == PartType::masterData) {
 		switch (data.compareMaster(m_lastMasterData)) {
 		case 1: // completely different
 			m_lastChangeTime = m_lastUpdateTime;
@@ -568,7 +568,7 @@ result_t Message::storeLastData(const PartType partType, SymbolString& data, uns
 			m_lastMasterData = data;
 			break;
 		}
-	} else if (partType == pt_slaveData) {
+	} else if (partType == PartType::slaveData) {
 		if (data != m_lastSlaveData) {
 			m_lastChangeTime = m_lastUpdateTime;
 			m_lastSlaveData = data;
@@ -582,11 +582,11 @@ result_t Message::decodeLastData(const PartType partType,
 		bool leadingSeparator, const char* fieldName, signed char fieldIndex)
 {
 	unsigned char offset;
-	if (partType == pt_masterData)
+	if (partType == PartType::masterData)
 		offset = (unsigned char)(m_id.size() - 2);
 	else
 		offset = 0;
-	result_t result = m_data->read(partType, partType==pt_masterData ? m_lastMasterData : m_lastSlaveData, offset, output, outputFormat, -1, leadingSeparator, fieldName, fieldIndex);
+	result_t result = m_data->read(partType, partType==PartType::masterData ? m_lastMasterData : m_lastSlaveData, offset, output, outputFormat, -1, leadingSeparator, fieldName, fieldIndex);
 	if (result < RESULT_OK)
 		return result;
 	if (result == RESULT_EMPTY && fieldName != NULL)
@@ -598,12 +598,12 @@ result_t Message::decodeLastData(ostringstream& output, OutputFormat outputForma
 		bool leadingSeparator, const char* fieldName, signed char fieldIndex)
 {
 	size_t startPos = output.str().length();
-	result_t result = m_data->read(pt_masterData, m_lastMasterData, getIdLength(), output, outputFormat, -1, leadingSeparator, fieldName, fieldIndex);
+	result_t result = m_data->read(PartType::masterData, m_lastMasterData, getIdLength(), output, outputFormat, -1, leadingSeparator, fieldName, fieldIndex);
 	if (result < RESULT_OK)
 		return result;
 	bool empty = result == RESULT_EMPTY;
 	leadingSeparator |= output.str().length() > startPos;
-	result = m_data->read(pt_slaveData, m_lastSlaveData, 0, output, outputFormat, -1, leadingSeparator, fieldName, fieldIndex);
+	result = m_data->read(PartType::slaveData, m_lastSlaveData, 0, output, outputFormat, -1, leadingSeparator, fieldName, fieldIndex);
 	if (result < RESULT_OK)
 		return result;
 	if (result == RESULT_EMPTY && !empty)
@@ -615,11 +615,11 @@ result_t Message::decodeLastData(ostringstream& output, OutputFormat outputForma
 
 result_t Message::decodeLastDataNumField(unsigned int& output, const char* fieldName, signed char fieldIndex)
 {
-	result_t result = m_data->read(pt_masterData, m_lastMasterData, getIdLength(), output, fieldName, fieldIndex);
+	result_t result = m_data->read(PartType::masterData, m_lastMasterData, getIdLength(), output, fieldName, fieldIndex);
 	if (result < RESULT_OK)
 		return result;
 	if (result == RESULT_EMPTY)
-		result = m_data->read(pt_slaveData, m_lastSlaveData, 0, output, fieldName, fieldIndex);
+		result = m_data->read(PartType::slaveData, m_lastSlaveData, 0, output, fieldName, fieldIndex);
 	if (result < RESULT_OK)
 		return result;
 	if (result == RESULT_EMPTY)
@@ -809,7 +809,7 @@ result_t ChainedMessage::prepareMasterPart(SymbolString& master, istringstream& 
 		return RESULT_ERR_NOTFOUND;
 
 	SymbolString allData(false);
-	result_t result = m_data->write(input, pt_masterData, allData, 0, separator);
+	result_t result = m_data->write(input, PartType::masterData, allData, 0, separator);
 	if (result != RESULT_OK)
 		return result;
 	size_t pos = 0, addData = 0;
@@ -851,9 +851,9 @@ result_t ChainedMessage::storeLastData(SymbolString& master, SymbolString& slave
 	// determine index from master ID
 	unsigned char index = 0;
 	if (checkId(master, &index)) {
-		result_t result = storeLastData(pt_masterData, master, index);
+		result_t result = storeLastData(PartType::masterData, master, index);
 		if (result>=RESULT_OK)
-			result = storeLastData(pt_slaveData, slave, index);
+			result = storeLastData(PartType::slaveData, slave, index);
 		return result;
 	}
 	return RESULT_ERR_INVALID_ARG;
@@ -863,7 +863,7 @@ result_t ChainedMessage::storeLastData(const PartType partType, SymbolString& da
 {
 	if (index>=m_ids.size())
 		return RESULT_ERR_INVALID_ARG;
-	if (partType == pt_masterData) {
+	if (partType == PartType::masterData) {
 		switch (data.compareMaster(*m_lastMasterDatas[index])) {
 		case 1: // completely different
 			*m_lastMasterDatas[index] = data;
@@ -873,7 +873,7 @@ result_t ChainedMessage::storeLastData(const PartType partType, SymbolString& da
 			break;
 		}
 		time(&m_lastMasterUpdateTimes[index]);
-	} else if (partType == pt_slaveData) {
+	} else if (partType == PartType::slaveData) {
 		if (data != *m_lastSlaveDatas[index]) {
 			*m_lastSlaveDatas[index] = data;
 		}
@@ -923,9 +923,9 @@ result_t ChainedMessage::storeLastData(const PartType partType, SymbolString& da
 		return RESULT_ERR_INVALID_POS;
 	master[4] = (unsigned char)(master.size()-5);
 	slave[0] = (unsigned char)(slave.size()-1);
-	result_t result = Message::storeLastData(pt_masterData, master, 0);
+	result_t result = Message::storeLastData(PartType::masterData, master, 0);
 	if (result==RESULT_OK)
-		result = Message::storeLastData(pt_slaveData, slave, 0);
+		result = Message::storeLastData(PartType::slaveData, slave, 0);
 	return result;
 }
 

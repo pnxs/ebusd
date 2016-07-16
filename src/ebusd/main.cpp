@@ -712,13 +712,13 @@ result_t loadScanConfigFile(MessageMap* messages, unsigned char address, SymbolS
 	PartType partType;
 	if (isMaster(address)) {
 		address = (unsigned char)(data[0]+5); // slave address of sending master
-		partType = pt_masterData;
+		partType = PartType::masterData;
 		if (data.size()<5+1+5+2+2) { // skip QQ ZZ PB SB NN
 			logError(lf_main, "unable to load scan config %2.2x: master part too short", address);
 			return RESULT_EMPTY;
 		}
 	} else {
-		partType = pt_slaveData;
+		partType = PartType::slaveData;
 		if (data.size()<1+1+5+2+2) { // skip NN
 			logError(lf_main, "unable to load scan config %2.2x: slave part too short", address);
 			return RESULT_EMPTY;

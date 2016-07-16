@@ -72,7 +72,7 @@ result_t PollRequest::prepare(unsigned char ownMasterAddress)
 bool PollRequest::notify(result_t result, SymbolString& slave)
 {
 	if (result == RESULT_OK) {
-		result = m_message->storeLastData(pt_slaveData, slave, m_index);
+		result = m_message->storeLastData(PartType::slaveData, slave, m_index);
 		if (result>=RESULT_OK && m_index+1 < m_message->getCount()) {
 			m_index++;
 			return true;
@@ -113,10 +113,10 @@ bool ScanRequest::notify(result_t result, SymbolString& slave)
 			auto message = m_messageMap->getScanMessage(dstAddress);
 			if (message!=NULL) {
 				m_message = message;
-				m_message->storeLastData(pt_masterData, m_master, m_index); // expected to work since this is a clone
+				m_message->storeLastData(PartType::masterData, m_master, m_index); // expected to work since this is a clone
 			}
 		}
-		result = m_message->storeLastData(pt_slaveData, slave, m_index);
+		result = m_message->storeLastData(PartType::slaveData, slave, m_index);
 		if (result>=RESULT_OK && m_index+1 < m_message->getCount()) {
 			m_index++;
 			result = prepare(m_master[0]);
