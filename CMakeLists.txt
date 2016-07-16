@@ -13,3 +13,5 @@ add_subdirectory(src/lib/utils)
 add_subdirectory(src/ebusd)
 add_subdirectory(src/tools)
 add_subdirectory(src/lib/ebus/test)
+
+# TODO: create config.h from config.h.in

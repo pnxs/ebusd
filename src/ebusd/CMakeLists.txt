@@ -12,3 +12,6 @@ main.cpp
 add_executable(ebusd ${SOURCES})
 target_link_libraries(ebusd utils ebus pthread)
 add_definitions(-DHAVE_CONFIG_H -DSYSCONFDIR=\"$(sysconfdir)\" -DLOCALSTATEDIR=\"$(localstatedir)\")
+
+# TODO: find out how to create directories on install
+#install(TARGET ebusd DIRECTORY $(DESTDIR)$(sysconfdir)/ebusd)
