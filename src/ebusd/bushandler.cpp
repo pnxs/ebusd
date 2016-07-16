@@ -982,7 +982,7 @@ result_t BusHandler::scanAndWait(unsigned char dstAddress, SymbolString& slave)
 			auto message = m_messages->getScanMessage(dstAddress);
 			if (message!=NULL && message!=scanMessage) {
 				scanMessage = message;
-				scanMessage->storeLastData(pt_masterData, master, 0); // update the cache, expected to work since this is a clone
+				scanMessage->storeLastData(PartType::masterData, master, 0); // update the cache, expected to work since this is a clone
 			}
 		}
 		if (result!=RESULT_ERR_NO_SIGNAL)
@@ -991,7 +991,7 @@ result_t BusHandler::scanAndWait(unsigned char dstAddress, SymbolString& slave)
 	if (result!=RESULT_OK)
 		return result;
 
-	return scanMessage->storeLastData(pt_slaveData, slave, 0); // update the cache
+	return scanMessage->storeLastData(PartType::slaveData, slave, 0); // update the cache
 }
 
 bool BusHandler::enableGrab(bool enable, bool all)
