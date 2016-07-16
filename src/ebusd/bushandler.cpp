@@ -44,18 +44,18 @@ using std::dec;
 const char* getStateCode(BusState state) {
 	switch (state)
 	{
-	case bs_noSignal:   return "no signal";
-	case bs_skip:       return "skip";
-	case bs_ready:      return "ready";
-	case bs_sendCmd:    return "send command";
-	case bs_recvCmdAck: return "receive command ACK";
-	case bs_recvRes:    return "receive response";
-	case bs_sendResAck: return "send response ACK";
-	case bs_recvCmd:    return "receive command";
-	case bs_recvResAck: return "receive response ACK";
-	case bs_sendCmdAck: return "send command ACK";
-	case bs_sendRes:    return "send response";
-	case bs_sendSyn:    return "send SYN";
+	case BusState::noSignal:   return "no signal";
+	case BusState::skip:       return "skip";
+	case BusState::ready:      return "ready";
+	case BusState::sendCmd:    return "send command";
+	case BusState::recvCmdAck: return "receive command ACK";
+	case BusState::recvRes:    return "receive response";
+	case BusState::sendResAck: return "send response ACK";
+	case BusState::recvCmd:    return "receive command";
+	case BusState::recvResAck: return "receive response ACK";
+	case BusState::sendCmdAck: return "send command ACK";
+	case BusState::sendRes:    return "send response";
+	case BusState::sendSyn:    return "send SYN";
 	default:            return "unknown";
 	}
 }
@@ -243,7 +243,7 @@ void BusHandler::run()
 				logNotice(lf_bus, "re-opened %s", m_device->getName());
 			else {
 				logError(lf_bus, "unable to open %s: %s", m_device->getName(), getResultCode(result));
-				setState(bs_noSignal, result);
+				setState(BusState::noSignal, result);
 			}
 			symCount = 0;
 		}
@@ -260,17 +260,17 @@ result_t BusHandler::handleSymbol()
 	// check if another symbol has to be sent and determine timeout for receive
 	switch (m_state)
 	{
-	case bs_noSignal:
+	case BusState::noSignal:
 		timeout = m_generateSynInterval>0 ? m_generateSynInterval : SIGNAL_TIMEOUT;
 		break;
 
-	case bs_skip:
+	case BusState::skip:
 		timeout = SYN_TIMEOUT;
 		break;
 
-	case bs_ready:
+	case BusState::ready:
 		if (m_currentRequest != NULL)
-			setState(bs_ready, RESULT_ERR_TIMEOUT); // just to be sure an old BusRequest is cleaned up
+			setState(BusState::ready, RESULT_ERR_TIMEOUT); // just to be sure an old BusRequest is cleaned up
 		if (m_remainLockCount == 0 && m_currentRequest == NULL) {
 			startRequest = m_nextRequests.peek();
 			if (startRequest == NULL && m_pollInterval > 0) { // check for poll/scan
@@ -299,51 +299,51 @@ result_t BusHandler::handleSymbol()
 		}
 		break;
 
-	case bs_recvCmd:
-	case bs_recvCmdAck:
+	case BusState::recvCmd:
+	case BusState::recvCmdAck:
 		timeout = m_slaveRecvTimeout;
 		break;
 
-	case bs_recvRes:
+	case BusState::recvRes:
 		if (m_response.size() > 0 || m_slaveRecvTimeout > SYN_TIMEOUT)
 			timeout = m_slaveRecvTimeout;
 		else
 			timeout = SYN_TIMEOUT;
 		break;
 
-	case bs_recvResAck:
+	case BusState::recvResAck:
 		timeout = m_slaveRecvTimeout+m_transferLatency;
 		break;
 
-	case bs_sendCmd:
+	case BusState::sendCmd:
 		if (m_currentRequest != NULL) {
 			sendSymbol = m_currentRequest->m_master[m_nextSendPos]; // escaped command
 			sending = true;
 		}
 		break;
 
-	case bs_sendResAck:
+	case BusState::sendResAck:
 		if (m_currentRequest != NULL) {
 			sendSymbol = m_responseCrcValid ? ACK : NAK;
 			sending = true;
 		}
 		break;
 
-	case bs_sendCmdAck:
+	case BusState::sendCmdAck:
 		if (m_answer) {
 			sendSymbol = m_commandCrcValid ? ACK : NAK;
 			sending = true;
 		}
 		break;
 
-	case bs_sendRes:
+	case BusState::sendRes:
 		if (m_answer) {
 			sendSymbol = m_response[m_nextSendPos]; // escaped response
 			sending = true;
 		}
 		break;
 
-	case bs_sendSyn:
+	case BusState::sendSyn:
 		sendSymbol = SYN;
 		sending = true;
 		break;
@@ -354,7 +354,7 @@ result_t BusHandler::handleSymbol()
 	if (sending) {
 		result = m_device->send(sendSymbol);
 		if (result == RESULT_OK) {
-			if (m_state == bs_ready)
+			if (m_state == BusState::ready)
 				timeout = m_transferLatency+m_busAcquireTimeout;
 			else
 				timeout = m_transferLatency+SEND_TIMEOUT;
@@ -364,7 +364,7 @@ result_t BusHandler::handleSymbol()
 			if (startRequest != NULL && m_nextRequests.remove(startRequest)) {
 				m_currentRequest = startRequest; // force the failed request to be notified
 			}
-			setState(bs_skip, result);
+			setState(BusState::skip, result);
 		}
 	}
 
@@ -373,14 +373,14 @@ result_t BusHandler::handleSymbol()
 	result = m_device->recv(timeout+m_transferLatency, recvSymbol);
 
 	if (!sending && result == RESULT_ERR_TIMEOUT && m_generateSynInterval > 0
-	&& timeout >= m_generateSynInterval && (m_state == bs_noSignal || m_state == bs_skip)) {
+	&& timeout >= m_generateSynInterval && (m_state == BusState::noSignal || m_state == BusState::skip)) {
 		// check if acting as AUTO-SYN generator is required
 		result = m_device->send(SYN);
 		if (result == RESULT_OK) {
 			recvSymbol = ESC;
 			result = m_device->recv(SEND_TIMEOUT, recvSymbol);
 			if (result == RESULT_ERR_TIMEOUT) {
-				return setState(bs_noSignal, result);
+				return setState(BusState::noSignal, result);
 			}
 			if (result != RESULT_OK)
 				logError(lf_bus, "unable to receive sent AUTO-SYN symbol: %s", getResultCode(result));
@@ -393,10 +393,10 @@ result_t BusHandler::handleSymbol()
 					logNotice(lf_bus, "acting as AUTO-SYN generator");
 				}
 				m_remainLockCount = 0;
-				return setState(bs_ready, result);
+				return setState(BusState::ready, result);
 			}
 		}
-		return setState(bs_skip, result);
+		return setState(BusState::skip, result);
 	}
 	time_t now;
 	time(&now);
@@ -405,44 +405,44 @@ result_t BusHandler::handleSymbol()
 			m_currentRequest = startRequest; // force the failed request to be notified
 		}
 		if ((m_generateSynInterval != SYN_TIMEOUT && difftime(now, m_lastReceive) > 1) // at least one full second has passed since last received symbol
-			|| m_state == bs_noSignal)
-			return setState(bs_noSignal, result);
+			|| m_state == BusState::noSignal)
+			return setState(BusState::noSignal, result);
 
-		return setState(bs_skip, result);
+		return setState(BusState::skip, result);
 	}
 
 	m_lastReceive = now;
-	if ((recvSymbol == SYN) && (m_state != bs_sendSyn)) {
+	if ((recvSymbol == SYN) && (m_state != BusState::sendSyn)) {
 		if (!sending && m_remainLockCount > 0 && m_command.size() != 1)
 			m_remainLockCount--;
 		else if (!sending && m_remainLockCount == 0 && m_command.size() == 1)
 			m_remainLockCount = 1; // wait for next AUTO-SYN after SYN / address / SYN (bus locked for own priority)
 
-		return setState(bs_ready, m_state == bs_skip ? RESULT_OK : RESULT_ERR_SYN);
+		return setState(BusState::ready, m_state == BusState::skip ? RESULT_OK : RESULT_ERR_SYN);
 	}
 
 	unsigned int headerLen, crcPos;
 
 	switch (m_state)
 	{
-	case bs_noSignal:
-		return setState(bs_skip, RESULT_OK);
+	case BusState::noSignal:
+		return setState(BusState::skip, RESULT_OK);
 
-	case bs_skip:
+	case BusState::skip:
 		return RESULT_OK;
 
-	case bs_ready:
+	case BusState::ready:
 		if (startRequest != NULL && sending) {
 			if (!m_nextRequests.remove(startRequest)) {
 				// request already removed (e.g. due to timeout)
-				return setState(bs_skip, RESULT_ERR_TIMEOUT);
+				return setState(BusState::skip, RESULT_ERR_TIMEOUT);
 			}
 			m_currentRequest = startRequest;
 			// check arbitration
 			if (recvSymbol == sendSymbol) { // arbitration successful
 				m_nextSendPos = 1;
 				m_repeat = false;
-				return setState(bs_sendCmd, RESULT_OK);
+				return setState(BusState::sendCmd, RESULT_OK);
 			}
 			// arbitration lost. if same priority class found, try again after next AUTO-SYN
 			m_remainLockCount = isMaster(recvSymbol) ? 2 : 1; // number of SYN to wait for before next send try
@@ -453,17 +453,17 @@ result_t BusHandler::handleSymbol()
 		}
 		result = m_command.push_back(recvSymbol, false); // expect no escaping for master address
 		if (result < RESULT_OK)
-			return setState(bs_skip, result);
+			return setState(BusState::skip, result);
 
 		m_repeat = false;
-		return setState(bs_recvCmd, RESULT_OK);
+		return setState(BusState::recvCmd, RESULT_OK);
 
-	case bs_recvCmd:
+	case BusState::recvCmd:
 		headerLen = 4;
 		crcPos = m_command.size() > headerLen ? headerLen + 1 + m_command[headerLen] : 0xff; // header symbols are never escaped
 		result = m_command.push_back(recvSymbol, true, m_command.size() < crcPos);
 		if (result < RESULT_OK)
-			return setState(bs_skip, result);
+			return setState(BusState::skip, result);
 
 		if (result == RESULT_OK && crcPos != 0xff && m_command.size() == crcPos + 1) { // CRC received
 			unsigned char dstAddress = m_command[1];
@@ -471,45 +471,45 @@ result_t BusHandler::handleSymbol()
 			if (m_commandCrcValid) {
 				if (dstAddress == BROADCAST) {
 					receiveCompleted();
-					return setState(bs_skip, RESULT_OK);
+					return setState(BusState::skip, RESULT_OK);
 				}
 				addSeenAddress(m_command[0]);
 				if (m_answer
 				        && (dstAddress == m_ownMasterAddress || dstAddress == m_ownSlaveAddress))
-					return setState(bs_sendCmdAck, RESULT_OK);
+					return setState(BusState::sendCmdAck, RESULT_OK);
 
-				return setState(bs_recvCmdAck, RESULT_OK);
+				return setState(BusState::recvCmdAck, RESULT_OK);
 			}
 			if (dstAddress == BROADCAST)
-				return setState(bs_skip, RESULT_ERR_CRC);
+				return setState(BusState::skip, RESULT_ERR_CRC);
 
 			if (m_answer
 			        && (dstAddress == m_ownMasterAddress || dstAddress == m_ownSlaveAddress)) {
-				return setState(bs_sendCmdAck, RESULT_ERR_CRC);
+				return setState(BusState::sendCmdAck, RESULT_ERR_CRC);
 			}
 			if (m_repeat)
-				return setState(bs_skip, RESULT_ERR_CRC);
-			return setState(bs_recvCmdAck, RESULT_ERR_CRC);
+				return setState(BusState::skip, RESULT_ERR_CRC);
+			return setState(BusState::recvCmdAck, RESULT_ERR_CRC);
 		}
 		return RESULT_OK;
 
-	case bs_recvCmdAck:
+	case BusState::recvCmdAck:
 		if (recvSymbol == ACK) {
 			if (!m_commandCrcValid)
-				return setState(bs_skip, RESULT_ERR_ACK);
+				return setState(BusState::skip, RESULT_ERR_ACK);
 
 			if (m_currentRequest != NULL) {
 				if (isMaster(m_currentRequest->m_master[1])) {
-					return setState(bs_sendSyn, RESULT_OK);
+					return setState(BusState::sendSyn, RESULT_OK);
 				}
 			}
 			else if (isMaster(m_command[1])) { // header symbols are never escaped
 				receiveCompleted();
-				return setState(bs_skip, RESULT_OK);
+				return setState(BusState::skip, RESULT_OK);
 			}
 
 			m_repeat = false;
-			return setState(bs_recvRes, RESULT_OK);
+			return setState(BusState::recvRes, RESULT_OK);
 		}
 		if (recvSymbol == NAK) {
 			if (!m_repeat) {
@@ -517,107 +517,107 @@ result_t BusHandler::handleSymbol()
 				m_nextSendPos = 0;
 				m_command.clear();
 				if (m_currentRequest != NULL)
-					return setState(bs_sendCmd, RESULT_ERR_NAK, true);
+					return setState(BusState::sendCmd, RESULT_ERR_NAK, true);
 
-				return setState(bs_recvCmd, RESULT_ERR_NAK);
+				return setState(BusState::recvCmd, RESULT_ERR_NAK);
 			}
 
-			return setState(bs_skip, RESULT_ERR_NAK);
+			return setState(BusState::skip, RESULT_ERR_NAK);
 		}
 
-		return setState(bs_skip, RESULT_ERR_ACK);
+		return setState(BusState::skip, RESULT_ERR_ACK);
 
-	case bs_recvRes:
+	case BusState::recvRes:
 		headerLen = 0;
 		crcPos = m_response.size() > headerLen ? headerLen + 1 + m_response[headerLen] : 0xff;
 		result = m_response.push_back(recvSymbol, true, m_response.size() < crcPos);
 		if (result < RESULT_OK)
-			return setState(bs_skip, result);
+			return setState(BusState::skip, result);
 
 		if (result == RESULT_OK && crcPos != 0xff && m_response.size() == crcPos + 1) { // CRC received
 			m_responseCrcValid = m_response[headerLen + 1 + m_response[headerLen]] == m_response.getCRC();
 			if (m_responseCrcValid) {
 				if (m_currentRequest != NULL)
-					return setState(bs_sendResAck, RESULT_OK);
+					return setState(BusState::sendResAck, RESULT_OK);
 
-				return setState(bs_recvResAck, RESULT_OK);
+				return setState(BusState::recvResAck, RESULT_OK);
 			}
 			if (m_repeat) {
 				if (m_currentRequest != NULL)
-					return setState(bs_sendSyn, RESULT_ERR_CRC);
+					return setState(BusState::sendSyn, RESULT_ERR_CRC);
 
-				return setState(bs_skip, RESULT_ERR_CRC);
+				return setState(BusState::skip, RESULT_ERR_CRC);
 			}
 			if (m_currentRequest != NULL)
-				return setState(bs_sendResAck, RESULT_ERR_CRC);
+				return setState(BusState::sendResAck, RESULT_ERR_CRC);
 
-			return setState(bs_recvResAck, RESULT_ERR_CRC);
+			return setState(BusState::recvResAck, RESULT_ERR_CRC);
 		}
 		return RESULT_OK;
 
-	case bs_recvResAck:
+	case BusState::recvResAck:
 		if (recvSymbol == ACK) {
 			if (!m_responseCrcValid)
-				return setState(bs_skip, RESULT_ERR_ACK);
+				return setState(BusState::skip, RESULT_ERR_ACK);
 
 			receiveCompleted();
-			return setState(bs_skip, RESULT_OK);
+			return setState(BusState::skip, RESULT_OK);
 		}
 		if (recvSymbol == NAK) {
 			if (!m_repeat) {
 				m_repeat = true;
 				m_response.clear();
-				return setState(bs_recvRes, RESULT_ERR_NAK, true);
+				return setState(BusState::recvRes, RESULT_ERR_NAK, true);
 			}
-			return setState(bs_skip, RESULT_ERR_NAK);
+			return setState(BusState::skip, RESULT_ERR_NAK);
 		}
-		return setState(bs_skip, RESULT_ERR_ACK);
+		return setState(BusState::skip, RESULT_ERR_ACK);
 
-	case bs_sendCmd:
+	case BusState::sendCmd:
 		if (m_currentRequest != NULL && sending && recvSymbol == sendSymbol) {
 			// successfully sent
 			m_nextSendPos++;
 			if (m_nextSendPos >= m_currentRequest->m_master.size()) {
 				// master data completely sent
 				if (m_currentRequest->m_master[1] == BROADCAST)
-					return setState(bs_sendSyn, RESULT_OK);
+					return setState(BusState::sendSyn, RESULT_OK);
 
 				m_commandCrcValid = true;
-				return setState(bs_recvCmdAck, RESULT_OK);
+				return setState(BusState::recvCmdAck, RESULT_OK);
 			}
 			return RESULT_OK;
 		}
-		return setState(bs_skip, RESULT_ERR_INVALID_ARG);
+		return setState(BusState::skip, RESULT_ERR_INVALID_ARG);
 
-	case bs_sendResAck:
+	case BusState::sendResAck:
 		if (m_currentRequest != NULL && sending && recvSymbol == sendSymbol) {
 			// successfully sent
 			if (!m_responseCrcValid) {
 				if (!m_repeat) {
 					m_repeat = true;
 					m_response.clear();
-					return setState(bs_recvRes, RESULT_ERR_NAK, true);
+					return setState(BusState::recvRes, RESULT_ERR_NAK, true);
 				}
-				return setState(bs_sendSyn, RESULT_ERR_ACK);
+				return setState(BusState::sendSyn, RESULT_ERR_ACK);
 			}
-			return setState(bs_sendSyn, RESULT_OK);
+			return setState(BusState::sendSyn, RESULT_OK);
 		}
-		return setState(bs_skip, RESULT_ERR_INVALID_ARG);
+		return setState(BusState::skip, RESULT_ERR_INVALID_ARG);
 
-	case bs_sendCmdAck:
+	case BusState::sendCmdAck:
 		if (sending && m_answer && recvSymbol == sendSymbol) {
 			// successfully sent
 			if (!m_commandCrcValid) {
 				if (!m_repeat) {
 					m_repeat = true;
 					m_command.clear();
-					return setState(bs_recvCmd, RESULT_ERR_NAK, true);
+					return setState(BusState::recvCmd, RESULT_ERR_NAK, true);
 				}
-				return setState(bs_skip, RESULT_ERR_ACK);
+				return setState(BusState::skip, RESULT_ERR_ACK);
 			}
 			if (isMaster(m_command[1])) {
 				receiveCompleted(); // decode command and store value
-				return setState(bs_skip, RESULT_OK);
+				return setState(BusState::skip, RESULT_OK);
 			}
 
 			m_nextSendPos = 0;
@@ -630,7 +630,7 @@ result_t BusHandler::handleSymbol()
 					message = NULL;
 			}
 			if (message == NULL || message->isWrite())
-				return setState(bs_skip, RESULT_ERR_INVALID_ARG); // don't know this request or definition has wrong direction, deny
+				return setState(BusState::skip, RESULT_ERR_INVALID_ARG); // don't know this request or definition has wrong direction, deny
 			if (message == m_messages->getScanMessage()) {
 				input.str(SCAN_ANSWER);
 			}
@@ -639,29 +639,29 @@ result_t BusHandler::handleSymbol()
 			m_response.clear(true); // escape while sending response
 			result = message->prepareSlave(input, m_response);
 			if (result != RESULT_OK)
-				return setState(bs_skip, result);
-			return setState(bs_sendRes, RESULT_OK);
+				return setState(BusState::skip, result);
+			return setState(BusState::sendRes, RESULT_OK);
 		}
-		return setState(bs_skip, RESULT_ERR_INVALID_ARG);
+		return setState(BusState::skip, RESULT_ERR_INVALID_ARG);
 
-	case bs_sendRes:
+	case BusState::sendRes:
 		if (sending && m_answer && recvSymbol == sendSymbol) {
 			// successfully sent
 			m_nextSendPos++;
 			if (m_nextSendPos >= m_response.size()) {
 				// slave data completely sent
-				return setState(bs_recvResAck, RESULT_OK);
+				return setState(BusState::recvResAck, RESULT_OK);
 			}
 			return RESULT_OK;
 		}
-		return setState(bs_skip, RESULT_ERR_INVALID_ARG);
+		return setState(BusState::skip, RESULT_ERR_INVALID_ARG);
 
-	case bs_sendSyn:
+	case BusState::sendSyn:
 		if (sending && recvSymbol == sendSymbol) {
 			// successfully sent
-			return setState(bs_skip, RESULT_OK);
+			return setState(BusState::skip, RESULT_OK);
 		}
-		return setState(bs_skip, RESULT_ERR_INVALID_ARG);
+		return setState(BusState::skip, RESULT_ERR_INVALID_ARG);
 
 	}
 
@@ -677,14 +677,14 @@ result_t BusHandler::setState(BusState state, result_t result, bool firstRepetit
 			m_nextRequests.push(m_currentRequest); // repeat
 			m_currentRequest = NULL;
 		}
-		else if (state == bs_sendSyn || (result != RESULT_OK && !firstRepetition)) {
+		else if (state == BusState::sendSyn || (result != RESULT_OK && !firstRepetition)) {
 			logDebug(lf_bus, "notify request: %s", getResultCode(result));
 			unsigned char dstAddress = m_currentRequest->m_master[1];
 			if (result == RESULT_OK)
 				addSeenAddress(dstAddress);
 
 			bool restart = m_currentRequest->notify(
-				result == RESULT_ERR_SYN && (m_state == bs_recvCmdAck || m_state == bs_recvRes) ? RESULT_ERR_TIMEOUT : result, m_response
+				result == RESULT_ERR_SYN && (m_state == BusState::recvCmdAck || m_state == BusState::recvRes) ? RESULT_ERR_TIMEOUT : result, m_response
 			);
 			if (restart) {
 				m_currentRequest->m_busLostRetries = 0;
@@ -699,7 +699,7 @@ result_t BusHandler::setState(BusState state, result_t result, bool firstRepetit
 		}
 	}
 
-	if (state == bs_noSignal) { // notify all requests
+	if (state ==BusState:: noSignal) { // notify all requests
 		m_response.clear(false); // notify with empty response
 		while ((m_currentRequest = m_nextRequests.pop()) != NULL) {
 			bool restart = m_currentRequest->notify(RESULT_ERR_NO_SIGNAL, m_response);
@@ -717,19 +717,19 @@ result_t BusHandler::setState(BusState state, result_t result, bool firstRepetit
 	if (state == m_state)
 		return result;
 
-	if (result < RESULT_OK || (result != RESULT_OK && state == bs_skip))
+	if (result < RESULT_OK || (result != RESULT_OK && state == BusState::skip))
 		logDebug(lf_bus, "%s during %s, switching to %s", getResultCode(result), getStateCode(m_state), getStateCode(state));
-	else if (m_currentRequest != NULL || state == bs_sendCmd || state == bs_sendResAck || state == bs_sendSyn)
+	else if (m_currentRequest != NULL || state == BusState::sendCmd || state == BusState::sendResAck || state == BusState::sendSyn)
 		logDebug(lf_bus, "switching from %s to %s", getStateCode(m_state), getStateCode(state));
 
-	if (state == bs_noSignal)
+	if (state == BusState::noSignal)
 		logError(lf_bus, "signal lost");
-	else if (m_state == bs_noSignal)
+	else if (m_state == BusState::noSignal)
 		logNotice(lf_bus, "signal acquired");
 
 	m_state = state;
 
-	if (state == bs_ready || state == bs_skip) {
+	if (state == BusState::ready || state == BusState::skip) {
 		m_command.clear();
 		m_commandCrcValid = false;
 		m_response.clear(false); // unescape while receiving response
@@ -780,7 +780,7 @@ void BusHandler::receiveCompleted()
 		logInfo(lf_update, "update MS cmd: %s / %s", m_command.getDataStr().c_str(), m_response.getDataStr().c_str());
 
 	auto message = m_messages->find(m_command);
-	if (m_grabUnknownMessages==gr_all || (message==NULL && m_grabUnknownMessages==gr_unknown)) {
+	if (m_grabUnknownMessages==GrabRequest::all || (message==NULL && m_grabUnknownMessages==GrabRequest::unknown)) {
 		string data;
 		string key = data = m_command.getDataStr();
 		if (key.length() > 2*(1+1+2+1+4)) {
@@ -996,10 +996,10 @@ result_t BusHandler::scanAndWait(unsigned char dstAddress, SymbolString& slave)
 
 bool BusHandler::enableGrab(bool enable, bool all)
 {
-	GrabRequest request = enable ? (all ? gr_all : gr_unknown) : gr_none;
+	GrabRequest request = enable ? (all ? GrabRequest::all : GrabRequest::unknown) : GrabRequest::none;
 	if (request==m_grabUnknownMessages)
 		return false;
-	if (m_grabUnknownMessages==gr_none)
+	if (m_grabUnknownMessages==GrabRequest::none)
 		m_grabbedUnknownMessages.clear();
 	m_grabUnknownMessages = request;
 	return true;
@@ -1007,7 +1007,7 @@ bool BusHandler::enableGrab(bool enable, bool all)
 
 void BusHandler::formatGrabResult(ostringstream& output)
 {
-	if (!m_grabUnknownMessages) {
+	if (m_grabUnknownMessages == GrabRequest::none) {
 		output << "grab disabled";
 	} else {
 		bool first = true;

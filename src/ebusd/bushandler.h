@@ -56,26 +56,26 @@
 #define SEND_TIMEOUT (2*SYMBOL_DURATION)
 
 /** the possible bus states. */
-enum BusState {
-	bs_noSignal,	//!< no signal on the bus
-	bs_skip,        //!< skip all symbols until next @a SYN
-	bs_ready,       //!< ready for next master (after @a SYN symbol, send/receive QQ)
-	bs_recvCmd,     //!< receive command (ZZ, PBSB, master data) [passive set]
-	bs_recvCmdAck,  //!< receive command ACK/NACK [passive set + active set+get]
-	bs_recvRes,     //!< receive response (slave data) [passive set + active get]
-	bs_recvResAck,  //!< receive response ACK/NACK [passive set]
-	bs_sendCmd,     //!< send command (ZZ, PBSB, master data) [active set+get]
-	bs_sendResAck,  //!< send response ACK/NACK [active get]
-	bs_sendCmdAck,  //!< send command ACK/NACK [passive get]
-	bs_sendRes,     //!< send response (slave data) [passive get]
-	bs_sendSyn,     //!< send SYN for completed transfer [active set+get]
+enum class BusState {
+	noSignal,	//!< no signal on the bus
+	skip,        //!< skip all symbols until next @a SYN
+	ready,       //!< ready for next master (after @a SYN symbol, send/receive QQ)
+	recvCmd,     //!< receive command (ZZ, PBSB, master data) [passive set]
+	recvCmdAck,  //!< receive command ACK/NACK [passive set + active set+get]
+	recvRes,     //!< receive response (slave data) [passive set + active get]
+	recvResAck,  //!< receive response ACK/NACK [passive set]
+	sendCmd,     //!< send command (ZZ, PBSB, master data) [active set+get]
+	sendResAck,  //!< send response ACK/NACK [active get]
+	sendCmdAck,  //!< send command ACK/NACK [passive get]
+	sendRes,     //!< send response (slave data) [passive get]
+	sendSyn,     //!< send SYN for completed transfer [active set+get]
 };
 
 /** the possible grab request kinds. */
-enum GrabRequest {
-	gr_none,	//!< no grabbing at all
-	gr_unknown, //!< grab unknown messages only
-	gr_all,     //!< grab all messages
+enum class GrabRequest {
+	none,	//!< no grabbing at all
+	unknown, //!< grab unknown messages only
+	all,     //!< grab all messages
 };
 
 /** bit for the seen state: seen. */
@@ -408,7 +408,7 @@ public:
 	 * Return true when a signal on the bus is available.
 	 * @return true when a signal on the bus is available.
 	 */
-	bool hasSignal() { return m_state != bs_noSignal; }
+	bool hasSignal() { return m_state != BusState::noSignal; }
 
 	/**
 	 * Return the current symbol rate.
@@ -548,7 +548,7 @@ private:
 	unsigned int m_maxSymPerSec = 0;
 
 	/** the current @a BusState. */
-	BusState m_state = bs_noSignal;
+	BusState m_state = BusState::noSignal;
 
 	/** whether the current message part is being repeated. */
 	bool m_repeat = false;
@@ -572,7 +572,7 @@ private:
 	map<unsigned char, string> m_scanResults;
 
 	/** whether to grab unknown messages. */
-	GrabRequest m_grabUnknownMessages = gr_all;
+	GrabRequest m_grabUnknownMessages = GrabRequest::all;
 
 	/** the grabbed unknown messages by ID prefix (QQZZPBSBNNDD with up to 4 DD bytes).*/
 	map<string, string> m_grabbedUnknownMessages;
