@@ -224,12 +224,12 @@ public:
 	/**
 	 * endless loop for connection instance.
 	 */
-	virtual void run();
+	virtual void run() override;
 
 	/**
 	 * Stop this connection.
 	 */
-	virtual void stop() { m_notify.notify(); Thread::stop(); }
+	virtual void stop() override { m_notify.notify(); Thread::stop(); }
 
 	/**
 	 * Return the ID of this connection.
@@ -282,12 +282,12 @@ public:
 	/**
 	 * endless loop for network instance.
 	 */
-	virtual void run();
+	virtual void run() override;
 
 	/**
 	 * shutdown network subsystem.
 	 */
-	void stop() const { m_notify.notify(); usleep(100000); }
+	void stop() override { m_notify.notify(); usleep(100000); }
 
 private:
 	/** the list of active @a Connection instances. */

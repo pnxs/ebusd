@@ -150,7 +150,7 @@ public:
 	 * Return the device name.
 	 * @return the device name (e.g. "/dev/ttyUSB0" for serial, "127.0.0.1:1234" for network).
 	 */
-	const char* getName() { return m_name; }
+	const char* getName() const { return m_name.c_str(); }
 
 	/**
 	 * Return whether the device is opened and available.
@@ -168,7 +168,7 @@ protected:
 	 * Check whether a byte is available immediately (without waiting).
 	 * @return true when a a byte is available immediately.
 	 */
-	virtual bool available() { return false; }
+	virtual bool available() const { return false; }
 
 	/**
 	 * Write a single byte.
@@ -243,14 +243,14 @@ public:
 		: Device(name, checkDevice, readOnly, initialSend, logRawFunc) {}
 
 	// @copydoc
-	virtual result_t open();
+	virtual result_t open() override;
 
 	// @copydoc
-	virtual void close();
+	virtual void close() override;
 
 protected:
 	// @copydoc
-	virtual void checkDevice();
+	virtual void checkDevice() override;
 
 private:
 	/** the previous settings of the device for restoring. */
@@ -279,23 +279,23 @@ public:
 		  m_buffer(NULL), m_bufSize(0), m_bufLen(0), m_bufPos(0) {}
 
 	// @copydoc
-	virtual unsigned int getLatency() const { return 10000; }
+	virtual unsigned int getLatency() const override { return 10000; }
 
 	// @copydoc
-	virtual result_t open();
+	virtual result_t open() override;
 
 protected:
 	// @copydoc
-	virtual void checkDevice();
+	virtual void checkDevice() override;
 
 	// @copydoc
-	virtual bool available();
+	virtual bool available() const override;
 
 	// @copydoc
-	virtual ssize_t write(const unsigned char value);
+	virtual ssize_t write(const unsigned char value) override;
 
 	// @copydoc
-	virtual ssize_t read(unsigned char& value);
+	virtual ssize_t read(unsigned char& value) override;
 
 private:
 	/** the socket address of the device. */

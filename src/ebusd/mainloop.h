@@ -47,7 +47,7 @@ public:
 	/**
 	 * Run the main loop.
 	 */
-	void run();
+	void run() override;
 
 	/**
 	 * Add a client @a NetMessage to the queue.
