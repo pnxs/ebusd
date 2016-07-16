@@ -54,9 +54,11 @@ public:
 	 */
 	Device(const char* name, const bool checkDevice, const bool readOnly, const bool initialSend,
 		void (*logRawFunc)(const unsigned char byte, bool received))
-		: m_name(name), m_checkDevice(checkDevice), m_readOnly(readOnly), m_initialSend(initialSend), m_fd(-1),
-		  m_logRaw(false), m_logRawFunc(logRawFunc),
-		  m_dumpRaw(false), m_dumpRawFile(NULL), m_dumpRawMaxSize(0), m_dumpRawStream(), m_dumpRawFileSize(0) {}
+		: m_name(name)
+		, m_checkDevice(checkDevice)
+		, m_readOnly(readOnly)
+		, m_initialSend(initialSend)
+		, m_logRawFunc(logRawFunc)
 
 	/**
 	 * Destructor.
@@ -187,38 +189,38 @@ protected:
 	const char* m_name;
 
 	/** whether to regularly check the device availability (only for serial devices). */
-	const bool m_checkDevice;
+	const bool m_checkDevice = false;
 
 	/** whether to allow read access to the device only. */
-	const bool m_readOnly;
+	const bool m_readOnly = false;
 
 	/** whether to send an initial @a ESC symbol in @a open(). */
-	const bool m_initialSend;
+	const bool m_initialSend = false;
 
 	/** the opened file descriptor, or -1. */
-	int m_fd;
+	int m_fd = -1;
 
 private:
 	/** whether logging of raw data is enabled. */
-	bool m_logRaw;
+	bool m_logRaw = false;
 
 	/** the function to call for logging raw data, or NULL. */
 	void (*m_logRawFunc)(const unsigned char byte, bool received);
 
 	/** whether dumping of raw data to a file is enabled. */
-	bool m_dumpRaw;
+	bool m_dumpRaw = false;
 
 	/** the name of the file to dump raw data to. */
-	const char* m_dumpRawFile;
+	const char* m_dumpRawFile = nullptr;
 
 	/** the maximum size of @a m_dumpFile, or 0 for infinite. */
-	long m_dumpRawMaxSize;
+	long m_dumpRawMaxSize = 0;
 
 	/** the @a ofstream for dumping raw data to. */
 	ofstream m_dumpRawStream;
 
 	/** the number of bytes already written to the @a m_dumpFile. */
-	long m_dumpRawFileSize;
+	long m_dumpRawFileSize = 0;
 
 };
 
@@ -300,7 +302,7 @@ private:
 	const struct sockaddr_in m_address;
 
 	/** true for UDP, false to TCP. */
-	const bool m_udp;
+	const bool m_udp = false;
 
 	/** the buffer memory, or NULL. */
 	unsigned char* m_buffer;

@@ -44,7 +44,7 @@ public:
 	 * @param isHttp whether this is a HTTP message.
 	 */
 	NetMessage(const bool isHttp)
-		: m_isHttp(isHttp), m_resultSet(false), m_disconnect(false), m_listening(false), m_listenSince(0)
+		: m_isHttp(isHttp)
 	{
 		pthread_mutex_init(&m_mutex, NULL);
 		pthread_cond_init(&m_cond, NULL);
@@ -177,13 +177,13 @@ private:
 	string m_request;
 
 	/** whether the result was already set. */
-	bool m_resultSet;
+	bool m_resultSet = false;
 
 	/** the result string. */
 	string m_result;
 
 	/** set to true when the client shall be disconnected. */
-	bool m_disconnect;
+	bool m_disconnect = false;
 
 	/** mutex variable for exclusive lock. */
 	pthread_mutex_t m_mutex;
@@ -192,10 +192,10 @@ private:
 	pthread_cond_t m_cond;
 
 	/** whether the client is in listening mode. */
-	bool m_listening;
+	bool m_listening = false;
 
 	/** start timestamp of listening update. */
-	time_t m_listenSince;
+	time_t m_listenSince = 0;
 
 };
 
@@ -306,7 +306,7 @@ private:
 	Notify m_notify;
 
 	/** true if this instance is listening */
-	bool m_listening;
+	bool m_listening = false;
 
 	/**
 	 * clean inactive connections from container.

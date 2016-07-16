@@ -83,10 +83,7 @@ Message::Message(const string& circuit, const string& name,
 		: m_circuit(circuit), m_name(name), m_isWrite(isWrite),
 		  m_isPassive(isPassive), m_comment(),
 		  m_srcAddress(SYN), m_dstAddress(SYN),
-		  m_data(data), m_deleteData(true),
-		  m_pollPriority(0),
-		  m_usedByCondition(false), m_condition(NULL),
-		  m_lastUpdateTime(0), m_lastChangeTime(0), m_pollCount(0), m_lastPollTime(0)
+		  m_data(data)
 {
 	m_id.push_back(pb);
 	m_id.push_back(sb);

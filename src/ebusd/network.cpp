@@ -148,7 +148,7 @@ void Connection::run()
 
 
 Network::Network(const bool local, const uint16_t port, const uint16_t httpPort, Queue<NetMessage*>& netQueue)
-	: m_netQueue(netQueue), m_listening(false)
+	: m_netQueue(netQueue)
 {
 	if (local)
 		m_tcpServer = std::make_unique<TCPServer>(port, "127.0.0.1");

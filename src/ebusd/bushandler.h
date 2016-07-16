@@ -319,14 +319,10 @@ public:
 		  m_ownMasterAddress(ownAddress), m_ownSlaveAddress((unsigned char)(ownAddress+5)), m_answer(answer),
 		  m_busLostRetries(busLostRetries), m_failedSendRetries(failedSendRetries),
 		  m_transferLatency(transferLatency), m_busAcquireTimeout(busAcquireTimeout), m_slaveRecvTimeout(slaveRecvTimeout),
-		  m_masterCount(1), m_autoLockCount(lockCount==0), m_lockCount(lockCount<=3 ? 3 : lockCount), m_remainLockCount(m_autoLockCount),
+		  m_autoLockCount(lockCount==0), m_lockCount(lockCount<=3 ? 3 : lockCount), m_remainLockCount(m_autoLockCount),
 		  m_generateSynInterval(generateSyn ? SYN_TIMEOUT*getMasterNumber(ownAddress)+SYMBOL_DURATION : 0),
-		  m_pollInterval(pollInterval), m_lastReceive(0), m_lastPoll(0),
-		  m_currentRequest(NULL), m_runningScans(0), m_nextSendPos(0),
-		  m_symPerSec(0), m_maxSymPerSec(0),
-		  m_state(bs_noSignal), m_repeat(false),
-		  m_command(false), m_commandCrcValid(false), m_response(false), m_responseCrcValid(false),
-		  m_grabUnknownMessages(gr_all) {
+		  m_pollInterval(pollInterval), m_command(false), m_response(false)
+    {
 		memset(m_seenAddresses, 0, sizeof(m_seenAddresses));
 	}
 
@@ -506,7 +502,7 @@ private:
 	const unsigned int m_slaveRecvTimeout;
 
 	/** the number of masters already seen. */
-	unsigned int m_masterCount;
+	unsigned int m_masterCount = 1;
 
 	/** whether m_lockCount shall be detected automatically. */
 	const bool m_autoLockCount;
@@ -524,10 +520,10 @@ private:
 	const unsigned int m_pollInterval;
 
 	/** the time of the last received symbol, or 0 for never. */
-	time_t m_lastReceive;
+	time_t m_lastReceive = 0;
 
 	/** the time of the last poll, or 0 for never. */
-	time_t m_lastPoll;
+	time_t m_lastPoll = 0;
 
 	/** the queue of @a BusRequests that shall be handled. */
 	Queue<BusRequest*> m_nextRequests;
@@ -539,35 +535,35 @@ private:
 	Queue<BusRequest*> m_finishedRequests;
 
 	/** the number of scan request currently running. */
-	unsigned int m_runningScans;
+	unsigned int m_runningScans = 0;
 
 	/** the offset of the next symbol that needs to be sent from the command or response,
 	 * (only relevant if m_request is set and state is @a bs_command or @a bs_response). */
-	unsigned char m_nextSendPos;
+	unsigned char m_nextSendPos = 0;
 
 	/** the number of received symbols in the last second. */
-	unsigned int m_symPerSec;
+	unsigned int m_symPerSec = 0;
 
 	/** the maximum number of received symbols per second ever seen. */
-	unsigned int m_maxSymPerSec;
+	unsigned int m_maxSymPerSec = 0;
 
 	/** the current @a BusState. */
-	BusState m_state;
+	BusState m_state = bs_noSignal;
 
 	/** whether the current message part is being repeated. */
-	bool m_repeat;
+	bool m_repeat = false;
 
 	/** the unescaped received command. */
 	SymbolString m_command;
 
 	/** whether the command CRC is valid. */
-	bool m_commandCrcValid;
+	bool m_commandCrcValid = false;
 
 	/** the unescaped received response or escaped response to send. */
 	SymbolString m_response;
 
 	/** whether the response CRC is valid. */
-	bool m_responseCrcValid;
+	bool m_responseCrcValid = false;
 
 	/** the participating bus addresses seen so far (0 if not seen yet, or combination of @a SEEN bits). */
 	unsigned char m_seenAddresses[256];
@@ -576,7 +572,7 @@ private:
 	map<unsigned char, string> m_scanResults;
 
 	/** whether to grab unknown messages. */
-	GrabRequest m_grabUnknownMessages;
+	GrabRequest m_grabUnknownMessages = gr_all;
 
 	/** the grabbed unknown messages by ID prefix (QQZZPBSBNNDD with up to 4 DD bytes).*/
 	map<string, string> m_grabbedUnknownMessages;

@@ -31,11 +31,6 @@ class Thread
 
 public:
 	/**
-	 * constructor.
-	 */
-	Thread() : m_threadid(0), m_started(false), m_running(false), m_stopped(false) {}
-
-	/**
 	 * virtual destructor.
 	 */
 	virtual ~Thread();
@@ -95,14 +90,13 @@ private:
 	pthread_t m_threadid;
 
 	/** Whether the thread was started. */
-	bool m_started;
+	bool m_started = false;
 
 	/** Whether the thread is still running (i.e. in @a run() ). */
-	bool m_running;
+	bool m_running = false;
 
 	/** Whether the thread was stopped by @a stop() or @a join(). */
-	bool m_stopped;
-
+	bool m_stopped = false;
 };
 
 

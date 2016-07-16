@@ -491,13 +491,13 @@ protected:
 	const bool m_deleteData;
 
 	/** the priority for polling, or 0 for no polling at all. */
-	unsigned char m_pollPriority;
+	unsigned char m_pollPriority = 0;
 
 	/** whether this message is used by a @a Condition. */
-	bool m_usedByCondition;
+	bool m_usedByCondition = false;
 
 	/** the @a Condition for this message, or NULL. */
-	Condition* m_condition;
+	Condition* m_condition = nullptr;
 
 	/** the last seen master data. */
 	SymbolString m_lastMasterData;
@@ -506,16 +506,16 @@ protected:
 	SymbolString m_lastSlaveData;
 
 	/** the system time when the message was last updated, 0 for never. */
-	time_t m_lastUpdateTime;
+	time_t m_lastUpdateTime = 0;
 
 	/** the system time when the message content was last changed, 0 for never. */
-	time_t m_lastChangeTime;
+	time_t m_lastChangeTime = 0;
 
 	/** the number of times this messages was already polled for. */
-	unsigned int m_pollCount;
+	unsigned int m_pollCount = 0;
 
 	/** the system time when this message was last polled for, 0 for never. */
-	time_t m_lastPollTime;
+	time_t m_lastPollTime = 0;
 
 };
 
@@ -718,10 +718,10 @@ public:
 protected:
 
 	/** the system time when the condition was last checked, 0 for never. */
-	time_t m_lastCheckTime;
+	time_t m_lastCheckTime = 0;
 
 	/** whether the condition was @a true during the last check. */
-	bool m_isTrue;
+	bool m_isTrue = false;
 
 };
 
@@ -1274,16 +1274,16 @@ private:
 	map<unsigned char, string> m_loadedFiles;
 
 	/** the maximum ID length used by any of the known @a Message instances. */
-	unsigned char m_maxIdLength;
+	unsigned char m_maxIdLength = 0;
 
 	/** the number of distinct @a Message instances stored in @a m_messagesByName. */
-	size_t m_messageCount;
+	size_t m_messageCount = 0;
 
 	/** the number of conditional @a Message instances part of @a m_messageCount. */
-	size_t m_conditionalMessageCount;
+	size_t m_conditionalMessageCount = 0;
 
 	/** the number of distinct passive @a Message instances stored in @a m_messagesByKey. */
-	size_t m_passiveMessageCount;
+	size_t m_passiveMessageCount = 0;
 
 	/** the known @a Message instances by lowercase circuit and name. */
 	map<string, vector<shared_ptr<Message>> > m_messagesByName;
