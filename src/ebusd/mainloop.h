@@ -42,7 +42,7 @@ public:
 	 * @param device the @a Device instance.
 	 * @param messages the @a MessageMap instance.
 	 */
-	MainLoop(const struct options& opt, Device *device, MessageMap* messages);
+	MainLoop(const struct options& opt, shared_ptr<Device> device, MessageMap* messages);
 
 	/**
 	 * Run the main loop.
@@ -58,7 +58,7 @@ public:
 private:
 
 	/** the @a Device instance. */
-	std::unique_ptr<Device> m_device;
+	std::shared_ptr<Device> m_device;
 
 	/** the @a MessageMap instance. */
 	MessageMap* m_messages;

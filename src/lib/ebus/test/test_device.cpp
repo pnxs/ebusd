@@ -24,7 +24,7 @@ using namespace std;
 
 int main ()
 {
-	Device* device = Device::create("/dev/ttyUSB20", true, false, NULL);
+	auto device = Device::create("/dev/ttyUSB20", true, false, false, NULL);
 	if (device == NULL) {
 		cout << "unable to create device" << endl;
 		return -1;
@@ -54,8 +54,6 @@ int main ()
 		if (!device->isValid())
 			cout << "close successful." << endl;
 	}
-
-	delete device;
 
 	return 0;
 }

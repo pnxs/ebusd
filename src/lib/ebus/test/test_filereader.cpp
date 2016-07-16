@@ -72,7 +72,7 @@ int main()
 
 	while (FileReader::splitFields(ifs, row, lineNo)) {
 		cout << "line " << static_cast<unsigned>(lineNo) << ": split OK" << endl;
-		string resultline[3] = resultlines[lineNo-1];
+		auto resultline = resultlines[lineNo-1];
 		if (row.empty()) {
 			cout << "  result empty";
 			if (resultline[0] == "") {

@@ -526,13 +526,13 @@ private:
 	time_t m_lastPoll = 0;
 
 	/** the queue of @a BusRequests that shall be handled. */
-	Queue<BusRequest*> m_nextRequests;
+	Queue<shared_ptr<BusRequest>> m_nextRequests;
 
 	/** the currently handled BusRequest, or NULL. */
-	BusRequest* m_currentRequest;
+	shared_ptr<BusRequest> m_currentRequest;
 
 	/** the queue of @a BusRequests that are already finished. */
-	Queue<BusRequest*> m_finishedRequests;
+	Queue<shared_ptr<BusRequest>> m_finishedRequests;
 
 	/** the number of scan request currently running. */
 	unsigned int m_runningScans = 0;

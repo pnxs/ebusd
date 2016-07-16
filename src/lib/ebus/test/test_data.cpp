@@ -382,9 +382,9 @@ int main()
 		{"x,,temp;HEX:2","18.004;13 14","10fe07000401121314", "00", ""}, // reference to template and base type
 	};
 	DataFieldTemplates* templates = new DataFieldTemplates();
-	DataField* fields = NULL;
+	shared_ptr<DataField> fields;
 	for (size_t i = 0; i < sizeof(checks) / sizeof(checks[0]); i++) {
-		string check[5] = checks[i];
+		auto check = checks[i];
 		istringstream isstr(check[0]);
 		string expectStr = check[1];
 		SymbolString mstr(false);
@@ -418,10 +418,7 @@ int main()
 		while (getline(isstr, item, FIELD_SEPARATOR))
 			entries.push_back(item);
 
-		if (fields != NULL) {
-			delete fields;
-			fields = NULL;
-		}
+		fields.reset();
 		vector<string>::iterator it = entries.begin();
 		result = DataField::create(it, entries.end(), templates, fields, isSet, isTemplate, !isTemplate && (mstr[1]==BROADCAST || isMaster(mstr[1])));
 		if (failedCreate) {
@@ -522,8 +519,6 @@ int main()
 				verify(failedWriteMatch, "write", expectStr, match, mstr.getDataStr(true, false) + " " + sstr.getDataStr(true, false), writeMstr.getDataStr(true, false) + " " + writeSstr.getDataStr(true, false));
 			}
 		}
-		delete fields;
-		fields = NULL;
 	}
 
 	delete templates;

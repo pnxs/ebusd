@@ -940,8 +940,8 @@ int main(int argc, char* argv[])
 		return EINVAL;
 
 	// open the device
-	Device *device = Device::create(opt.device, !opt.noDeviceCheck, opt.readOnly, opt.initialSend, &logRawData);
-	if (device == NULL) {
+	auto device = Device::create(opt.device, !opt.noDeviceCheck, opt.readOnly, opt.initialSend, &logRawData);
+	if (not device) {
 		logError(lf_main, "unable to create device %s", opt.device);
 		return EINVAL;
 	}

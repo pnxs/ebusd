@@ -130,8 +130,8 @@ int main(int argc, char* argv[])
 	if (argp_parse(&argp, argc, argv, ARGP_IN_ORDER, NULL, &opt) != 0)
 		return EINVAL;
 
-	Device* device = Device::create(opt.device, false, false, NULL);
-	if (device == NULL) {
+	auto device = Device::create(opt.device, false, false, false,NULL);
+	if (not device) {
 		cout << "unable to create device " << opt.device << endl;
 		return EINVAL;
 	}
@@ -164,8 +164,6 @@ int main(int argc, char* argv[])
 		else
 			cout << "error opening file " << opt.dumpFile << endl;
 	}
-
-	delete device;
 
 	exit(EXIT_SUCCESS);
 }

@@ -50,13 +50,13 @@ Message::Message(const string& circuit, const string& name,
 		const bool isWrite, const bool isPassive, const string comment,
 		const unsigned char srcAddress, const unsigned char dstAddress,
 		const vector<unsigned char> id,
-		shared_ptr<DataField> data, const bool deleteData,
+		shared_ptr<DataField> data,
 		const unsigned char pollPriority,
 		Condition* condition)
 		: m_circuit(circuit), m_name(name), m_isWrite(isWrite),
 		  m_isPassive(isPassive), m_comment(comment),
 		  m_srcAddress(srcAddress), m_dstAddress(dstAddress),
-		  m_id(id), m_data(data), m_deleteData(deleteData),
+		  m_id(id), m_data(data),
 		  m_pollPriority(pollPriority),
 		  m_usedByCondition(false), m_condition(condition),
 		  m_lastUpdateTime(0), m_lastChangeTime(0), m_pollCount(0), m_lastPollTime(0)
@@ -79,7 +79,7 @@ Message::Message(const string& circuit, const string& name,
 Message::Message(const string& circuit, const string& name,
 		const bool isWrite, const bool isPassive,
 		const unsigned char pb, const unsigned char sb,
-		shared_ptr<DataField> data, const bool deleteData)
+		shared_ptr<DataField> data)
 		: m_circuit(circuit), m_name(name), m_isWrite(isWrite),
 		  m_isPassive(isPassive), m_comment(),
 		  m_srcAddress(SYN), m_dstAddress(SYN),
@@ -366,9 +366,9 @@ result_t Message::create(vector<string>::iterator& it, const vector<string>::ite
 		}
 		shared_ptr<Message> message;
 		if (chainIds.size()>1) {
-			message = make_shared<ChainedMessage>(useCircuit, name, isWrite, comment, srcAddress, dstAddress, id, chainIds, chainLengths, data, index==0, pollPriority, condition);
+			message = make_shared<ChainedMessage>(useCircuit, name, isWrite, comment, srcAddress, dstAddress, id, chainIds, chainLengths, data, pollPriority, condition);
 		} else
-			message = make_shared<Message>(useCircuit, name, isWrite, isPassive, comment, srcAddress, dstAddress, id, data, index==0, pollPriority, condition);
+			message = make_shared<Message>(useCircuit, name, isWrite, isPassive, comment, srcAddress, dstAddress, id, data, pollPriority, condition);
 		messages.push_back(message);
 	}
 	return RESULT_OK;
@@ -379,8 +379,7 @@ shared_ptr<Message> Message::derive(const unsigned char dstAddress, const unsign
 	return make_shared<Message>(circuit.length()==0 ? m_circuit : circuit, m_name,
 		m_isWrite, m_isPassive, m_comment,
 		srcAddress==SYN ? m_srcAddress : srcAddress, dstAddress,
-		m_id, m_data, false,
-		m_pollPriority, m_condition);
+		m_id, m_data, m_pollPriority, m_condition);
 }
 
 shared_ptr<Message> Message::derive(const unsigned char dstAddress, const bool extendCircuit)
@@ -712,43 +711,36 @@ void Message::dumpColumn(ostream& output, size_t column, bool withConditions)
 }
 
 
-ChainedMessage::ChainedMessage(const string circuit, const string name,
-		const bool isWrite, const string comment,
-		const unsigned char srcAddress, const unsigned char dstAddress,
-		const vector<unsigned char> id,
-		vector< vector<unsigned char> > ids, vector<unsigned char> lengths,
-		shared_ptr<DataField> data, const bool deleteData,
-		const unsigned char pollPriority,
-		Condition* condition)
+ChainedMessage::ChainedMessage(const string &circuit, const string &name,
+							   const bool isWrite, const string comment,
+							   const unsigned char srcAddress, const unsigned char dstAddress,
+							   const vector<unsigned char> &id,
+							   const vector<vector<unsigned char>> &ids, const vector<unsigned char> &lengths,
+							   shared_ptr<DataField> data,
+							   const unsigned char pollPriority,
+							   Condition *condition)
 		: Message(circuit, name, isWrite, false, comment,
 		  srcAddress, dstAddress, id,
-		  data, deleteData, pollPriority, condition),
+		  data, pollPriority, condition),
 		  m_ids(ids), m_lengths(lengths),
 		  m_maxTimeDiff(m_ids.size()*15) // 15 seconds per message
 {
 	size_t cnt = ids.size();
-	m_lastMasterDatas = (SymbolString**)calloc(cnt, sizeof(SymbolString*));
-	m_lastSlaveDatas = (SymbolString**)calloc(cnt, sizeof(SymbolString*));
-	m_lastMasterUpdateTimes = (time_t*)calloc(cnt, sizeof(time_t));
-	m_lastSlaveUpdateTimes = (time_t*)calloc(cnt, sizeof(time_t));
+
+	m_lastMasterDatas.resize(cnt);
+	m_lastSlaveDatas.resize(cnt);
+
+	m_lastMasterUpdateTimes.resize(cnt);
+	m_lastSlaveUpdateTimes.resize(cnt);
+
 	for (size_t index=0; index<cnt; index++) {
-		m_lastMasterDatas[index] = new SymbolString();
-		m_lastSlaveDatas[index] = new SymbolString();
+		m_lastMasterDatas[index] = make_shared<SymbolString>();
+		m_lastSlaveDatas[index] = make_shared<SymbolString>();
 	}
 }
 
 ChainedMessage::~ChainedMessage()
 {
-	for (unsigned char index=0; index<m_ids.size(); index++) {
-		delete m_lastMasterDatas[index];
-		m_lastMasterDatas[index] = NULL;
-		delete m_lastSlaveDatas[index];
-		m_lastSlaveDatas[index] = NULL;
-	}
-	free(m_lastMasterDatas);
-	free(m_lastSlaveDatas);
-	free(m_lastMasterUpdateTimes);
-	free(m_lastSlaveUpdateTimes);
 }
 
 shared_ptr<Message> ChainedMessage::derive(const unsigned char dstAddress, const unsigned char srcAddress, const string circuit)
@@ -756,7 +748,7 @@ shared_ptr<Message> ChainedMessage::derive(const unsigned char dstAddress, const
 	return make_shared<ChainedMessage>(circuit.length()==0 ? m_circuit : circuit, m_name,
 		m_isWrite, m_comment,
 		srcAddress==SYN ? m_srcAddress : srcAddress, dstAddress,
-		m_id, m_ids, m_lengths, m_data, false,
+		m_id, m_ids, m_lengths, m_data,
 		m_pollPriority, m_condition);
 }
 
@@ -904,7 +896,7 @@ result_t ChainedMessage::storeLastData(const PartType partType, SymbolString& da
 	SymbolString slave(false);
 	size_t offset = 5+(m_ids[0].size()-2); // skip QQ, ZZ, PB, SB, NN
 	for (index=0; index<m_ids.size(); index++) {
-		SymbolString* add = m_lastMasterDatas[index];
+		auto add = m_lastMasterDatas[index];
 		size_t end = 5+(*add)[4];
 		for (size_t pos=index==0?0:offset; pos<end; pos++) {
 			master.push_back((*add)[pos], false, false);

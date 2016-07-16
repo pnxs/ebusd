@@ -87,7 +87,7 @@ public:
 			const bool isWrite, const bool isPassive, const string comment,
 			const unsigned char srcAddress, const unsigned char dstAddress,
 			const vector<unsigned char> id,
-			shared_ptr<DataField> data, const bool deleteData,
+			shared_ptr<DataField> data,
 			const unsigned char pollPriority,
 			Condition* condition=NULL);
 
@@ -101,12 +101,11 @@ public:
 	 * @param pb the primary ID byte.
 	 * @param sb the secondary ID byte.
 	 * @param data the @a DataField for encoding/decoding the message.
-	 * @param deleteData whether to delete the @a DataField during destruction.
 	 */
 	Message(const string& circuit, const string& name,
 			const bool isWrite, const bool isPassive,
 			const unsigned char pb, const unsigned char sb,
-			shared_ptr<DataField> data, const bool deleteData);
+			shared_ptr<DataField> data);
 
 	/**
 	 * Destructor.
@@ -487,9 +486,6 @@ protected:
 	/** the @a DataField for encoding/decoding the message. */
 	shared_ptr<DataField> m_data;
 
-	/** whether to delete the @a DataField during destruction. */
-	const bool m_deleteData;
-
 	/** the priority for polling, or 0 for no polling at all. */
 	unsigned char m_pollPriority = 0;
 
@@ -539,18 +535,17 @@ public:
 	 * @param ids the primary, secondary, and optional further ID bytes for each part of the chain.
 	 * @param lengths the data length for each part of the chain.
 	 * @param data the @a DataField for encoding/decoding the chained message.
-	 * @param deleteData whether to delete the @a DataField during destruction.
 	 * @param pollPriority the priority for polling, or 0 for no polling at all.
 	 * @param condition the @a Condition for this message, or NULL.
 	 */
-	ChainedMessage(const string circuit, const string name,
-			const bool isWrite, const string comment,
-			const unsigned char srcAddress, const unsigned char dstAddress,
-			const vector<unsigned char> id,
-			vector< vector<unsigned char> > ids, vector<unsigned char> lengths,
-			shared_ptr<DataField> data, const bool deleteData,
-			const unsigned char pollPriority,
-			Condition* condition=NULL);
+	ChainedMessage(const string &circuit, const string &name,
+				   const bool isWrite, const string comment,
+				   const EbusAddress srcAddress, const EbusAddress dstAddress,
+				   const vector<unsigned char> &id,
+				   const vector<vector<unsigned char>> &ids, const vector<unsigned char> &lengths,
+				   shared_ptr<DataField> data,
+				   const unsigned char pollPriority,
+				   Condition *condition = NULL);
 
 	virtual ~ChainedMessage();
 
@@ -599,16 +594,16 @@ private:
 	const time_t m_maxTimeDiff;
 
 	/** array of the last seen master datas. */
-	SymbolString** m_lastMasterDatas;
+	vector<shared_ptr<SymbolString>> m_lastMasterDatas;
 
 	/** array of the last seen slave datas. */
-	SymbolString** m_lastSlaveDatas;
+	vector<shared_ptr<SymbolString>> m_lastSlaveDatas;
 
 	/** array of the system times when the corresponding master data was last updated, 0 for never. */
-	time_t* m_lastMasterUpdateTimes;
+	vector<time_t> m_lastMasterUpdateTimes;
 
 	/** array of the system times when the corresponding slave data was last updated, 0 for never. */
-	time_t* m_lastSlaveUpdateTimes;
+	vector<time_t> m_lastSlaveUpdateTimes;
 
 };
 
@@ -657,13 +652,6 @@ public:
 class Condition
 {
 public:
-
-	/**
-	 * Construct a new instance.
-	 */
-	Condition()
-		: m_lastCheckTime(0), m_isTrue(false) { }
-
 	/**
 	 * Destructor.
 	 */
@@ -1065,9 +1053,9 @@ public:
 	 * @param addAll whether to add all messages, even if duplicate.
 	 */
 	MessageMap(const bool addAll=false) : FileReader::FileReader(true),
-		m_addAll(addAll), m_maxIdLength(0), m_messageCount(0), m_conditionalMessageCount(0), m_passiveMessageCount(0)
+		m_addAll(addAll)
 	{
-		m_scanMessage = make_shared<Message>("scan", "ident", false, false, 0x07, 0x04, DataFieldSet::getIdentFields(), true);
+		m_scanMessage = make_shared<Message>("scan", "ident", false, false, 0x07, 0x04, DataFieldSet::getIdentFields());
 	}
 
 	/**

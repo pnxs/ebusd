@@ -186,13 +186,13 @@ result_t BusHandler::sendAndWait(SymbolString& master, SymbolString& slave)
 {
 	result_t result = RESULT_ERR_NO_SIGNAL;
 	slave.clear();
-	ActiveBusRequest request(master, slave);
+	auto request = make_shared<ActiveBusRequest>(master, slave);
 	logInfo(lf_bus, "send message: %s", master.getDataStr().c_str());
 
 	for (int sendRetries = m_failedSendRetries + 1; sendRetries >= 0; sendRetries--) {
-		m_nextRequests.push(&request);
-		bool success = m_finishedRequests.remove(&request, true);
-		result = success ? request.m_result : RESULT_ERR_TIMEOUT;
+		m_nextRequests.push(request);
+		bool success = m_finishedRequests.remove(request, true);
+		result = success ? request->m_result : RESULT_ERR_TIMEOUT;
 
 		if (result == RESULT_OK) {
 			auto message = m_messages->find(master);
@@ -206,7 +206,7 @@ result_t BusHandler::sendAndWait(SymbolString& master, SymbolString& slave)
 		}
 		logError(lf_bus, "send to %2.2x: %s%s", master[1], getResultCode(result), sendRetries>0 ? ", retry" : "");
 
-		request.m_busLostRetries = 0;
+		request->m_busLostRetries = 0;
 	}
 
 	return result;
@@ -255,7 +255,7 @@ result_t BusHandler::handleSymbol()
 	long timeout = SYN_TIMEOUT;
 	unsigned char sendSymbol = ESC;
 	bool sending = false;
-	BusRequest* startRequest = NULL;
+	shared_ptr<BusRequest> startRequest;
 
 	// check if another symbol has to be sent and determine timeout for receive
 	switch (m_state)
@@ -280,11 +280,10 @@ result_t BusHandler::handleSymbol()
 					auto message = m_messages->getNextPoll();
 					if (message != NULL) {
 						m_lastPoll = now;
-						PollRequest* request = new PollRequest(message);
+						auto request = make_shared<PollRequest>(message);
 						result_t ret = request->prepare(m_ownMasterAddress);
 						if (ret != RESULT_OK) {
 							logError(lf_bus, "prepare poll message: %s", getResultCode(ret));
-							delete request;
 						}
 						else {
 							startRequest = request;
@@ -690,8 +689,9 @@ result_t BusHandler::setState(BusState state, result_t result, bool firstRepetit
 			if (restart) {
 				m_currentRequest->m_busLostRetries = 0;
 				m_nextRequests.push(m_currentRequest);
-			} else if (m_currentRequest->m_deleteOnFinish) {
-				delete m_currentRequest;
+			}
+			else if (m_currentRequest->m_deleteOnFinish) {
+				m_currentRequest.reset();
 			} else {
 				m_finishedRequests.push(m_currentRequest);
 			}
@@ -708,7 +708,7 @@ result_t BusHandler::setState(BusState state, result_t result, bool firstRepetit
 				m_nextRequests.push(m_currentRequest);
 			}
 			else if (m_currentRequest->m_deleteOnFinish)
-				delete m_currentRequest;
+				m_currentRequest.reset();
 			else
 				m_finishedRequests.push(m_currentRequest);
 		}
@@ -858,10 +858,9 @@ result_t BusHandler::startScan(bool full)
 		slaves.push_back(slave);
 	}
 	messages.push_front(scanMessage);
-	ScanRequest* request = new ScanRequest(m_messages, messages, slaves, this);
+	auto request = make_shared<ScanRequest>(m_messages, messages, slaves, this);
 	result_t result = request->prepare(m_ownMasterAddress);
 	if (result < RESULT_OK) {
-		delete request;
 		return result==RESULT_ERR_EOF ? RESULT_EMPTY : result;
 	}
 	m_runningScans++;
