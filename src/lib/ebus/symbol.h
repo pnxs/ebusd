@@ -203,41 +203,4 @@ private:
 	unsigned char m_crc = 0;
 };
 
-
-/**
- * Returns whether the address is one of the 25 master addresses.
- * @param addr the address to check.
- * @return <code>true</code> if the specified address is a master address.
- */
-bool isMaster(unsigned char addr);
-
-/**
- * Returns whether the address is a slave address of one of the 25 masters.
- * @param addr the address to check.
- * @return <code>true</code> if the specified address is a slave address of a master.
- */
-bool isSlaveMaster(unsigned char addr);
-
-/**
- * Returns the master address associated with the specified address (master or slave).
- * @param addr the address to check.
- * @return the master address, or SYN if the specified address is neither a master address nor a slave address of a master.
- */
-unsigned char getMasterAddress(unsigned char addr);
-
-/**
- * Returns the number of the master if the address is a valid bus address.
- * @param addr the bus address.
- * @return the number of the master if the address is a valid bus address (1 to 25), or 0.
- */
-unsigned char getMasterNumber(unsigned char addr);
-
-/**
- * Returns whether the address is a valid bus address.
- * @param addr the address to check.
- * @param allowBroadcast whether to also allow @a addr to be the broadcast address (default true).
- * @return <code>true</code> if the specified address is a valid bus address.
- */
-bool isValidAddress(unsigned char addr, bool allowBroadcast=true);
-
 #endif // LIBEBUS_SYMBOL_H_

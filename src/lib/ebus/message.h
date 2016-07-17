@@ -22,6 +22,7 @@
 #include "data.h"
 #include "result.h"
 #include "symbol.h"
+#include "Address.h"
 #include <string>
 #include <vector>
 #include <deque>
@@ -85,7 +86,7 @@ public:
 	 */
 	Message(const string& circuit, const string& name,
 			const bool isWrite, const bool isPassive, const string comment,
-			const unsigned char srcAddress, const unsigned char dstAddress,
+			const libebus::Address& srcAddress, const libebus::Address& dstAddress,
 			const vector<unsigned char> id,
 			shared_ptr<DataField> data,
 			const unsigned char pollPriority,
@@ -143,7 +144,8 @@ public:
 	 * @param circuit the new circuit name, or empty to use the current circuit name.
 	 * @return the derived @a Message instance.
 	 */
-	virtual shared_ptr<Message> derive(const unsigned char dstAddress, const unsigned char srcAddress=SYN, const string circuit="");
+	virtual shared_ptr<Message> derive(const libebus::Address &dstAddress, const libebus::Address &srcAddress = SYN,
+									   const string circuit = "");
 
 	/**
 	 * Derive a new @a Message from this message.
@@ -188,13 +190,13 @@ public:
 	 * Get the source address.
 	 * @return the source address, or @a SYN for any.
 	 */
-	unsigned char getSrcAddress() const { return m_srcAddress; }
+	libebus::Address getSrcAddress() const { return m_srcAddress; }
 
 	/**
 	 * Get the destination address.
 	 * @return the destination address, or @a SYN for any.
 	 */
-	unsigned char getDstAddress() const { return m_dstAddress; }
+	libebus::Address getDstAddress() const { return m_dstAddress; }
 
 	/**
 	 * Get the primary command byte.
@@ -247,7 +249,7 @@ public:
 	 * @param dstAddress the destination address for the derivation.
 	 * @return the derived key for storing in @a MessageMap.
 	 */
-	unsigned long long getDerivedKey(const unsigned char dstAddress);
+	unsigned long long getDerivedKey(const libebus::Address &dstAddress);
 
 	/**
 	 * Get the polling priority, or 0 for no polling at all.
@@ -302,9 +304,9 @@ public:
 	 * @param index the index of the part to prepare.
 	 * @return @a RESULT_OK on success, or an error code.
 	 */
-	result_t prepareMaster(const unsigned char srcAddress, SymbolString& masterData,
+	result_t prepareMaster(const libebus::Address srcAddress, SymbolString& masterData,
 			istringstream& input, char separator=UI_FIELD_SEPARATOR,
-			const unsigned char dstAddress=SYN, unsigned char index=0);
+			const libebus::Address dstAddress=SYN, unsigned char index=0);
 
 protected:
 
@@ -452,10 +454,10 @@ protected:
 	const string m_comment;
 
 	/** the source address, or @a SYN for any (only relevant if passive). */
-	const unsigned char m_srcAddress;
+	const libebus::Address m_srcAddress;
 
 	/** the destination address, or @a SYN for any (only for temporary scan messages). */
-	const unsigned char m_dstAddress;
+	const libebus::Address m_dstAddress;
 
 	/** the primary, secondary, and optionally further command ID bytes. */
 	vector<unsigned char> m_id;
@@ -540,7 +542,7 @@ public:
 	 */
 	ChainedMessage(const string &circuit, const string &name,
 				   const bool isWrite, const string comment,
-				   const EbusAddress srcAddress, const EbusAddress dstAddress,
+				   const libebus::Address& srcAddress, const libebus::Address& dstAddress,
 				   const vector<unsigned char> &id,
 				   const vector<vector<unsigned char>> &ids, const vector<unsigned char> &lengths,
 				   shared_ptr<DataField> data,
@@ -550,7 +552,8 @@ public:
 	virtual ~ChainedMessage();
 
 	// @copydoc
-	virtual shared_ptr<Message> derive(const unsigned char dstAddress, const unsigned char srcAddress=SYN, const string circuit="");
+	virtual shared_ptr<Message> derive(const libebus::Address &dstAddress, const libebus::Address &srcAddress = SYN,
+									   const string circuit = "");
 
 	// @copydoc
 	virtual unsigned char getIdLength() const { return (unsigned char)(m_ids[0].size() - 2); }
@@ -730,7 +733,8 @@ public:
 	 * @param field the field name.
 	 * @param hasValues whether a value has to be checked against.
 	 */
-	SimpleCondition(const string condName, const string circuit, const string name, const unsigned char dstAddress, const string field, const bool hasValues=false)
+	SimpleCondition(const string condName, const string circuit, const string name, const libebus::Address &dstAddress,
+					const string field, const bool hasValues = false)
 		: Condition(),
 		  m_condName(condName), m_circuit(circuit), m_name(name), m_dstAddress(dstAddress), m_field(field), m_hasValues(hasValues), m_message(NULL) { }
 
@@ -787,7 +791,7 @@ private:
 	const string m_name;
 
 	/** the override destination address, or @a SYN (only for @a Message without specific destination as well as scan message). */
-	const unsigned char m_dstAddress;
+	const libebus::Address m_dstAddress;
 
 	/** the field name, or empty for first field. */
 	const string m_field;
@@ -817,7 +821,9 @@ public:
 	 * @param field the field name.
 	 * @param valueRanges the valid value ranges (pairs of from/to inclusive), empty for @a m_message seen check.
 	 */
-	SimpleNumericCondition(const string condName, const string circuit, const string name, const unsigned char dstAddress, const string field, const vector<unsigned int> valueRanges)
+	SimpleNumericCondition(const string condName, const string circuit, const string name,
+						   const libebus::Address &dstAddress, const string field,
+						   const vector<unsigned int> valueRanges)
 		: SimpleCondition(condName, circuit, name, dstAddress, field, true),
 		  m_valueRanges(valueRanges) { }
 
@@ -855,7 +861,8 @@ public:
 	 * @param field the field name.
 	 * @param values the valid values.
 	 */
-	SimpleStringCondition(const string condName, const string circuit, const string name, const unsigned char dstAddress, const string field, const vector<string> values)
+	SimpleStringCondition(const string condName, const string circuit, const string name,
+						  const libebus::Address &dstAddress, const string field, const vector<string> values)
 		: SimpleCondition(condName, circuit, name, dstAddress, field, true),
 		  m_values(values) { }
 
@@ -1098,7 +1105,7 @@ public:
 	 * @param dstAddress the destination address, or @a SYN for the base scan @a Message.
 	 * @return the scan @a Message instance, or NULL if the dstAddress is no slave.
 	 */
-	shared_ptr<Message> getScanMessage(const unsigned char dstAddress=SYN);
+	shared_ptr<Message> getScanMessage(const libebus::Address &dstAddress = SYN);
 
 	/**
 	 * Resolve all @a Condition instances.
@@ -1134,7 +1141,7 @@ public:
 	 * @param address the slave address.
 	 * @return the name of the file(s) loaded for the participant (separated by comma and enclosed in double quotes), or empty.
 	 */
-	string getLoadedFiles(unsigned char address);
+	string getLoadedFiles(const libebus::Address &address);
 
 	/**
 	 * Get the stored @a Message instances for the key.

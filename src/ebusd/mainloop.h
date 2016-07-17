@@ -27,8 +27,6 @@
 
 /** \file mainloop.h */
 
-//using namespace std;
-
 /**
  * The main loop handling requests from connected clients.
  */
@@ -64,7 +62,7 @@ private:
 	MessageMap* m_messages;
 
 	/** the own master address for sending on the bus. */
-	const unsigned char m_address;
+	const libebus::Address m_address;
 
 	/** whether to pick configuration files matching initial scan. */
 	const bool m_scanConfig;
@@ -111,7 +109,7 @@ private:
 	 * @param dstAddress the destination address to set, or @a SYN to keep the address defined during construction.
 	 * @return the result code.
 	 */
-	result_t readFromBus(shared_ptr<Message> message, string inputStr, const unsigned char dstAddress=SYN);
+	result_t readFromBus(shared_ptr<Message> message, string inputStr, const libebus::Address &dstAddress = SYN);
 
 	/**
 	 * Execute the read command.

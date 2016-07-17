@@ -30,6 +30,7 @@
 #include <cstring>
 #include <time.h>
 #include <iomanip>
+#include <Address.h>
 
 using std::dec;
 
@@ -60,7 +61,7 @@ const char* getStateCode(BusState state) {
 	}
 }
 
-result_t PollRequest::prepare(unsigned char ownMasterAddress)
+result_t PollRequest::prepare(const libebus::Address &ownMasterAddress)
 {
 	istringstream input;
 	result_t result = m_message->prepareMaster(ownMasterAddress, m_master, input, m_index);
@@ -90,7 +91,7 @@ bool PollRequest::notify(result_t result, SymbolString& slave)
 }
 
 
-result_t ScanRequest::prepare(unsigned char ownMasterAddress)
+result_t ScanRequest::prepare(const libebus::Address &ownMasterAddress)
 {
 	if (m_slaves.empty())
 		return RESULT_ERR_EOF;
@@ -293,7 +294,7 @@ result_t BusHandler::handleSymbol()
 				}
 			}
 			if (startRequest != NULL) { // initiate arbitration
-				sendSymbol = m_ownMasterAddress;
+				sendSymbol = m_ownMasterAddress.binAddr();
 				sending = true;
 			}
 		}
@@ -445,7 +446,7 @@ result_t BusHandler::handleSymbol()
 				return setState(BusState::sendCmd, RESULT_OK);
 			}
 			// arbitration lost. if same priority class found, try again after next AUTO-SYN
-			m_remainLockCount = isMaster(recvSymbol) ? 2 : 1; // number of SYN to wait for before next send try
+			m_remainLockCount = libebus::Address(recvSymbol).isMaster() ? 2 : 1; // number of SYN to wait for before next send try
 			if ((recvSymbol & 0x0f) != (sendSymbol & 0x0f) && m_lockCount > m_remainLockCount)
 				// if different priority class found, try again after N AUTO-SYN symbols (at least next AUTO-SYN)
 				m_remainLockCount = m_lockCount;
@@ -466,7 +467,7 @@ result_t BusHandler::handleSymbol()
 			return setState(BusState::skip, result);
 
 		if (result == RESULT_OK && crcPos != 0xff && m_command.size() == crcPos + 1) { // CRC received
-			unsigned char dstAddress = m_command[1];
+			libebus::Address dstAddress = m_command[1];
 			m_commandCrcValid = m_command[headerLen + 1 + m_command[headerLen]] == m_command.getCRC(); // header symbols are never escaped
 			if (m_commandCrcValid) {
 				if (dstAddress == BROADCAST) {
@@ -499,11 +500,11 @@ result_t BusHandler::handleSymbol()
 				return setState(BusState::skip, RESULT_ERR_ACK);
 
 			if (m_currentRequest != NULL) {
-				if (isMaster(m_currentRequest->m_master[1])) {
+				if (libebus::Address(m_currentRequest->m_master[1]).isMaster()) {
 					return setState(BusState::sendSyn, RESULT_OK);
 				}
 			}
-			else if (isMaster(m_command[1])) { // header symbols are never escaped
+			else if (libebus::Address(m_command[1]).isMaster()) { // header symbols are never escaped
 				receiveCompleted();
 				return setState(BusState::skip, RESULT_OK);
 			}
@@ -615,7 +616,7 @@ result_t BusHandler::handleSymbol()
 				}
 				return setState(BusState::skip, RESULT_ERR_ACK);
 			}
-			if (isMaster(m_command[1])) {
+			if (libebus::Address(m_command[1]).isMaster()) {
 				receiveCompleted(); // decode command and store value
 				return setState(BusState::skip, RESULT_OK);
 			}
@@ -740,38 +741,41 @@ result_t BusHandler::setState(BusState state, result_t result, bool firstRepetit
 	return result;
 }
 
-void BusHandler::addSeenAddress(unsigned char address)
+void BusHandler::addSeenAddress(libebus::Address address)
 {
-	if (!isValidAddress(address, false))
+	if (not address.isValid(false))
 		return;
-	if (!isMaster(address)) {
-		m_seenAddresses[address] |= SEEN;
-		address = getMasterAddress(address);
+	if (not address.isMaster()) {
+		m_seenAddresses[address.binAddr()] |= SEEN;
+		address = address.getMasterAddress().binAddr();
 		if (address==SYN)
 			return;
 	}
-	if ((m_seenAddresses[address]&SEEN)==0) {
-		if (!m_answer || address!=m_ownMasterAddress) {
+	if ((m_seenAddresses[address.binAddr()]&SEEN)==0) {
+		if (!m_answer || address != m_ownMasterAddress) {
 			m_masterCount++;
 			if (m_autoLockCount && m_masterCount>m_lockCount)
 				m_lockCount = m_masterCount;
 			logNotice(lf_bus, "new master %2.2x, master count %d", address, m_masterCount);
 		}
-		m_seenAddresses[address] |= SEEN;
+		m_seenAddresses[address.binAddr()] |= SEEN;
 	}
 }
 
 void BusHandler::receiveCompleted()
 {
-	unsigned char srcAddress = m_command[0], dstAddress = m_command[1];
+	libebus::Address srcAddress = m_command[0];
+	libebus::Address dstAddress = m_command[1];
+
 	if (srcAddress == dstAddress) {
 		logError(lf_bus, "invalid self-addressed message from %2.2x", srcAddress);
 		return;
 	}
-	addSeenAddress(srcAddress);
-	addSeenAddress(dstAddress);
 
-	bool master = isMaster(dstAddress);
+	addSeenAddress(srcAddress.binAddr());
+	addSeenAddress(dstAddress.binAddr());
+
+	bool master = dstAddress.isMaster();
 	if (dstAddress == BROADCAST)
 		logInfo(lf_update, "update BC cmd: %s", m_command.getDataStr().c_str());
 	else if (master)
@@ -848,14 +852,15 @@ result_t BusHandler::startScan(bool full)
 
 	deque<unsigned char> slaves;
 	for (unsigned char slave = 1; slave != 0; slave++) { // 0 is known to be a master
-		if (!isValidAddress(slave, false) || isMaster(slave))
+		libebus::Address slaveAddr(slave);
+		if (not slaveAddr.isValid(false) || slaveAddr.isMaster())
 			continue;
-		if (!full && (m_seenAddresses[slave]&SEEN)==0) {
-			unsigned char master = getMasterAddress(slave); // check if we saw the corresponding master already
+		if (!full && (m_seenAddresses[slaveAddr.binAddr()]&SEEN)==0) {
+			unsigned char master = slaveAddr.getMasterAddress().binAddr(); // check if we saw the corresponding master already
 			if (master == SYN || (m_seenAddresses[master]&SEEN)==0)
 				continue;
 		}
-		slaves.push_back(slave);
+		slaves.push_back(slaveAddr.binAddr());
 	}
 	messages.push_front(scanMessage);
 	auto request = make_shared<ScanRequest>(m_messages, messages, slaves, this);
@@ -903,7 +908,8 @@ void BusHandler::formatScanResult(ostringstream& output)
 	if (first) {
 		// fallback to autoscan results
 		for (unsigned char slave = 1; slave != 0; slave++) { // 0 is known to be a master
-			if (isValidAddress(slave, false) && !isMaster(slave) && (m_seenAddresses[slave]&SCAN_DONE)!=0) {
+			libebus::Address slaveAddr(slave);
+			if (slaveAddr.isValid(false) && not slaveAddr.isMaster() && (m_seenAddresses[slave]&SCAN_DONE)!=0) {
 				auto message = m_messages->getScanMessage(slave);
 				if (message!=NULL && message->getLastUpdateTime()>0) {
 					if (first)
@@ -920,31 +926,33 @@ void BusHandler::formatScanResult(ostringstream& output)
 
 void BusHandler::formatSeenInfo(ostringstream& output)
 {
-	unsigned char address = 0;
-	for (int index=0; index<256; index++, address++) {
-		if (isValidAddress(address, false)
-		&& ((m_seenAddresses[address]&SEEN)!=0 || address==m_ownMasterAddress || address==m_ownSlaveAddress)) {
-			output << endl << "address " << setfill('0') << setw(2) << hex << static_cast<unsigned>(address);
-			unsigned char master;
-			if (isMaster(address)) {
+	unsigned char rawAddress = 0;
+
+	for (int index=0; index<256; index++, rawAddress++) {
+		libebus::Address address(rawAddress);
+		if (address.isValid(false)
+		&& ((m_seenAddresses[address.binAddr()]&SEEN)!=0 || address==m_ownMasterAddress || address==m_ownSlaveAddress)) {
+			output << endl << "address " << setfill('0') << setw(2) << hex << static_cast<unsigned>(address.binAddr());
+			libebus::Address master;
+			if (address.isMaster()) {
 				output << ": master";
 				master = address;
 			} else {
 				output << ": slave";
-				master = getMasterAddress(address);
+				master = address.getMasterAddress();
 			}
 			if (master != SYN)
-				output << " #" << setw(0) << dec << static_cast<unsigned>(getMasterNumber(master));
+				output << " #" << setw(0) << dec << static_cast<unsigned>(master.getMasterNumber());
 			if (address==m_ownMasterAddress || (m_answer && address==m_ownSlaveAddress)) {
 				output << ", ebusd";
 				if (m_answer) {
 					output << " (answering)";
 				}
-				if ((m_seenAddresses[address]&SEEN)!=0) {
+				if ((m_seenAddresses[address.binAddr()]&SEEN)!=0) {
 					output << ", conflict";
 				}
 			}
-			if ((m_seenAddresses[address]&SCAN_DONE)!=0) {
+			if ((m_seenAddresses[address.binAddr()]&SCAN_DONE)!=0) {
 				output << ", scanned";
 				auto message = m_messages->getScanMessage(address);
 				if (message!=NULL && message->getLastUpdateTime()>0) {
@@ -964,29 +972,29 @@ void BusHandler::formatSeenInfo(ostringstream& output)
 	}
 }
 
-result_t BusHandler::scanAndWait(unsigned char dstAddress, SymbolString& slave)
+result_t BusHandler::scanAndWait(const libebus::Address& dstAddress, SymbolString& slave)
 {
-	if (!isValidAddress(dstAddress, false) || isMaster(dstAddress))
+	if (not dstAddress.isValid(false) || dstAddress.isMaster())
 		return RESULT_ERR_INVALID_ADDR;
-	m_seenAddresses[dstAddress] |= SCAN_INIT;
+	m_seenAddresses[dstAddress.binAddr()] |= SCAN_INIT;
 	auto scanMessage = m_messages->getScanMessage();
 	if (scanMessage==NULL) {
 		return RESULT_ERR_NOTFOUND;
 	}
 	istringstream input;
 	SymbolString master;
-	result_t result = scanMessage->prepareMaster(m_ownMasterAddress, master, input, UI_FIELD_SEPARATOR, dstAddress);
+	result_t result = scanMessage->prepareMaster(m_ownMasterAddress, master, input, UI_FIELD_SEPARATOR, dstAddress.binAddr());
 	if (result==RESULT_OK) {
 		result = sendAndWait(master, slave);
 		if (result==RESULT_OK) {
-			auto message = m_messages->getScanMessage(dstAddress);
+			auto message = m_messages->getScanMessage(dstAddress.binAddr());
 			if (message!=NULL && message!=scanMessage) {
 				scanMessage = message;
 				scanMessage->storeLastData(PartType::masterData, master, 0); // update the cache, expected to work since this is a clone
 			}
 		}
 		if (result!=RESULT_ERR_NO_SIGNAL)
-			m_seenAddresses[dstAddress] |= SCAN_DONE;
+			m_seenAddresses[dstAddress.binAddr()] |= SCAN_DONE;
 	}
 	if (result!=RESULT_OK)
 		return result;
@@ -1022,16 +1030,18 @@ void BusHandler::formatGrabResult(ostringstream& output)
 }
 
 unsigned char BusHandler::getNextScanAddress(unsigned char lastAddress, bool& scanned) {
+	libebus::Address ebusAddr(lastAddress);
+
 	if (lastAddress==SYN)
 		return SYN;
 	while (++lastAddress!=0) { // 0 is known to be a master
-		if (!isValidAddress(lastAddress, false) || isMaster(lastAddress))
+		if (not ebusAddr.isValid(false) || ebusAddr.isMaster())
 			continue;
 		if ((m_seenAddresses[lastAddress]&(SEEN|LOAD_INIT))==SEEN) {
 			scanned = (m_seenAddresses[lastAddress]&SCAN_INIT)!=0;
 			return lastAddress;
 		}
-		unsigned char master = getMasterAddress(lastAddress);
+		unsigned char master = ebusAddr.getMasterAddress().binAddr();
 		if (master!=SYN && (m_seenAddresses[master]&SEEN)!=0 && (m_seenAddresses[lastAddress]&LOAD_INIT)==0) {
 			scanned = (m_seenAddresses[lastAddress]&SCAN_INIT)!=0;
 			return lastAddress;

@@ -265,7 +265,7 @@ error_t parse_opt(int key, char *arg, struct argp_state *state)
 	// eBUS options:
 	case 'a': // --address=31
 		opt->address = (unsigned char)parseInt(arg, 16, 0, 0xff, result);
-		if (result != RESULT_OK || !isMaster(opt->address)) {
+		if (result != RESULT_OK || not opt->address.isMaster()) {
 			argp_error(state, "invalid address");
 			return EINVAL;
 		}
@@ -707,11 +707,11 @@ result_t loadConfigFiles(MessageMap* messages, bool verbose, bool denyRecursive)
 	return result;
 }
 
-result_t loadScanConfigFile(MessageMap* messages, unsigned char address, SymbolString& data, string& relativeFile, bool verbose)
+result_t loadScanConfigFile(MessageMap* messages, libebus::Address address, SymbolString& data, string& relativeFile, bool verbose)
 {
 	PartType partType;
-	if (isMaster(address)) {
-		address = (unsigned char)(data[0]+5); // slave address of sending master
+	if (address.isMaster()) {
+		address = libebus::Address(data[0]+5); // slave address of sending master
 		partType = PartType::masterData;
 		if (data.size()<5+1+5+2+2) { // skip QQ ZZ PB SB NN
 			logError(lf_main, "unable to load scan config %2.2x: master part too short", address);
@@ -738,7 +738,7 @@ result_t loadScanConfigFile(MessageMap* messages, unsigned char address, SymbolS
 		transform(path.begin(), path.end(), path.begin(), ::tolower);
 		path = string(opt.configPath) + "/" + path;
 		out.str("");
-		out << setw(2) << hex << setfill('0') << nouppercase << static_cast<unsigned>(address) << ".";
+		out << setw(2) << hex << setfill('0') << nouppercase << static_cast<unsigned>(address.binAddr()) << ".";
 		prefix = out.str();
 		out.str("");
 		out.clear();
@@ -784,7 +784,7 @@ result_t loadScanConfigFile(MessageMap* messages, unsigned char address, SymbolS
 	string best;
 	for (vector<string>::iterator it = files.begin(); it!=files.end(); it++) {
 		string name = *it;
-		unsigned char checkDest;
+		libebus::Address checkDest;
 		string checkIdent, useCircuit, useSuffix;
 		unsigned int checkSw, checkHw;
 		if (!FileReader::extractDefaultsFromFilename(name.substr(path.length()+1), checkDest, checkIdent, useCircuit, useSuffix, checkSw, checkHw)) {

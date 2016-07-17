@@ -23,6 +23,7 @@
 #include "data.h"
 #include "message.h"
 #include <stdint.h>
+#include <Address.h>
 
 /** \file main.h */
 
@@ -40,7 +41,7 @@ struct options
 	int checkConfig; //!< check CSV config files (!=0) and optionally dump (2), then stop
 	int pollInterval; //!< poll interval in seconds, 0 to disable [5]
 
-	unsigned char address; //!< own bus address [31]
+	libebus::Address address; //!< own bus address [31]
 	bool answer; //!< answer to requests from other masters
 	int acquireTimeout; //!< bus acquisition timeout in us [9400]
 	int acquireRetries; //!< number of retries for bus acquisition [3]
@@ -90,6 +91,6 @@ result_t loadConfigFiles(MessageMap* messages, bool verbose=false, bool denyRecu
  * @param verbose whether to verbosely log problems.
  * @return the result code.
  */
-result_t loadScanConfigFile(MessageMap* messages, unsigned char address, SymbolString& data, string& relativeFile, bool verbose=false);
+result_t loadScanConfigFile(MessageMap* messages, libebus::Address address, SymbolString& data, string& relativeFile, bool verbose=false);
 
 #endif // MAIN_H_

@@ -22,6 +22,7 @@
 #include "symbol.h"
 #include "result.h"
 #include "cppconfig.h"
+#include "Address.h"
 #include <climits>
 #include <string>
 #include <iostream>
@@ -98,7 +99,7 @@ public:
 		if (lastSep!=string::npos) { // potential destination address, matches "^ZZ."
 			// extract defaultDest, defaultCircuit, defaultSuffix from filename:
 			// ZZ.IDENT[.CIRCUIT][.SUFFIX].*csv
-			unsigned char checkDest;
+			libebus::Address checkDest;
 			string checkIdent, useCircuit, useSuffix;
 			unsigned int checkSw, checkHw;
 			if (extractDefaultsFromFilename(filename.substr(lastSep+1), checkDest, checkIdent, useCircuit, useSuffix, checkSw, checkHw)) {
@@ -314,8 +315,8 @@ public:
 	 * @param hardware the hardware version part HWXXXX (BCD digits, set to @a UINT_MAX if not present).
 	 * @return true if at least the address and the identification part were extracted, false otherwise.
 	 */
-	static bool extractDefaultsFromFilename(string name, unsigned char& dest, string& ident, string& circuit,
-		string& suffix, unsigned int& software, unsigned int& hardware)
+	static bool extractDefaultsFromFilename(string name, libebus::Address &dest, string &ident, string &circuit,
+											string &suffix, unsigned int &software, unsigned int &hardware)
 	{
 		ident = circuit = suffix = "";
 		software = hardware = UINT_MAX;
@@ -328,7 +329,7 @@ public:
 		}
 		result_t result = RESULT_OK;
 		dest = (unsigned char)parseInt(name.substr(0, pos).c_str(), 16, 0, 0xff, result, NULL);
-		if (result!=RESULT_OK || !isValidAddress(dest)) {
+		if (result!=RESULT_OK || not dest.isValid()) {
 			return false; // invalid "ZZ"
 		}
 		name.erase(0, pos);

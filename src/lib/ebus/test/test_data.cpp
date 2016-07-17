@@ -19,6 +19,7 @@
 #include "data.h"
 #include <iostream>
 #include <iomanip>
+#include <Address.h>
 
 using namespace std;
 
@@ -420,7 +421,8 @@ int main()
 
 		fields.reset();
 		vector<string>::iterator it = entries.begin();
-		result = DataField::create(it, entries.end(), templates, fields, isSet, isTemplate, !isTemplate && (mstr[1]==BROADCAST || isMaster(mstr[1])));
+		libebus::Address mstrAddr(mstr[1]);
+		result = DataField::create(it, entries.end(), templates, fields, isSet, isTemplate, !isTemplate && (mstrAddr==BROADCAST || mstrAddr.isMaster()));
 		if (failedCreate) {
 			if (result == RESULT_OK) {
 				cout << "\"" << check[0] << "\": failed create error: unexpectedly succeeded" << endl;

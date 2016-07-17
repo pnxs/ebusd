@@ -286,16 +286,16 @@ result_t MainLoop::parseHexMaster(vector<string> &args, size_t argPos, SymbolStr
 	if (ret == RESULT_OK && (4+length)*2 != msg.str().size())
 		return RESULT_ERR_INVALID_ARG;
 
-	ret = master.push_back(m_address, false);
+	ret = master.push_back(m_address.binAddr(), false);
 	if (ret == RESULT_OK)
 		ret = master.parseHex(msg.str());
-	if (ret == RESULT_OK && !isValidAddress(master[1]))
+	if (ret == RESULT_OK && not libebus::Address(master[1]).isValid())
 		ret = RESULT_ERR_INVALID_ADDR;
 
 	return ret;
 }
 
-result_t MainLoop::readFromBus(shared_ptr<Message> message, string inputStr, const unsigned char dstAddress)
+result_t MainLoop::readFromBus(shared_ptr<Message> message, string inputStr, const libebus::Address &dstAddress)
 {
 	result_t ret = RESULT_EMPTY;
 	SymbolString master(true);
@@ -366,8 +366,8 @@ string MainLoop::executeRead(vector<string> &args)
 				break;
 			}
 			result_t ret;
-			dstAddress = (unsigned char)parseInt(args[argPos].c_str(), 16, 0, 0xff, ret);
-			if (ret != RESULT_OK || !isValidAddress(dstAddress) || isMaster(dstAddress))
+			libebus::Address dstAddress = parseInt(args[argPos].c_str(), 16, 0, 0xff, ret);
+			if (ret != RESULT_OK || not dstAddress.isValid() || dstAddress.isMaster())
 				return getResultCode(RESULT_ERR_INVALID_ADDR);
 		} else if (args[argPos] == "-p") {
 			argPos++;
@@ -402,9 +402,12 @@ string MainLoop::executeRead(vector<string> &args)
 	if (hex && argPos > 0) {
 		SymbolString cacheMaster(false);
 		result_t ret = parseHexMaster(args, argPos, cacheMaster);
+
+		libebus::Address address(cacheMaster[1]);
+
 		if (ret != RESULT_OK)
 			return getResultCode(ret);
-		if (cacheMaster[1] == BROADCAST || isMaster(cacheMaster[1]))
+		if (address == BROADCAST || address.isMaster())
 			return getResultCode(RESULT_ERR_INVALID_ARG);
 
 		logNotice(lf_main, "read hex cmd: %s", cacheMaster.getDataStr(true, false).c_str());
@@ -541,7 +544,7 @@ string MainLoop::executeWrite(vector<string> &args)
 	size_t argPos = 1;
 	bool hex = false;
 	string circuit;
-	unsigned char dstAddress = SYN;
+	libebus::Address dstAddress = SYN;
 	while (args.size() > argPos && args[argPos][0] == '-') {
 		if (args[argPos] == "-h") {
 			hex = true;
@@ -552,8 +555,8 @@ string MainLoop::executeWrite(vector<string> &args)
 				break;
 			}
 			result_t ret;
-			dstAddress = (unsigned char)parseInt(args[argPos].c_str(), 16, 0, 0xff, ret);
-			if (ret != RESULT_OK || !isValidAddress(dstAddress) || isMaster(dstAddress))
+			dstAddress = parseInt(args[argPos].c_str(), 16, 0, 0xff, ret);
+			if (ret != RESULT_OK || not dstAddress.isValid() || dstAddress.isMaster())
 				return getResultCode(RESULT_ERR_INVALID_ADDR);
 		} else if (args[argPos] == "-c") {
 			argPos++;
@@ -607,9 +610,12 @@ string MainLoop::executeWrite(vector<string> &args)
 				logInfo(lf_main, "write hex %s %s cache update: %s", message->getCircuit().c_str(), message->getName().c_str(), result.str().c_str());
 			else
 				logError(lf_main, "write hex %s %s cache update: %s", message->getCircuit().c_str(), message->getName().c_str(), getResultCode(ret));
-			if (master[1] == BROADCAST)
+
+			libebus::Address address(master[1]);
+
+			if (address == BROADCAST)
 				return "done broadcast";
-			if (isMaster(master[1]))
+			if (address.isMaster())
 				return getResultCode(RESULT_OK);
 			return slave.getDataStr();
 		}
@@ -644,7 +650,7 @@ string MainLoop::executeWrite(vector<string> &args)
 
 	dstAddress = message->getLastMasterData()[1];
 	ostringstream result;
-	if (dstAddress == BROADCAST || isMaster(dstAddress)) {
+	if (dstAddress == BROADCAST || dstAddress.isMaster()) {
 		logInfo(lf_main, "write %s %s: %s", message->getCircuit().c_str(), message->getName().c_str(), getResultCode(ret));
 		if (dstAddress == BROADCAST)
 			return "done broadcast";
@@ -687,10 +693,12 @@ string MainLoop::executeHex(vector<string> &args)
 		SymbolString slave(false);
 		ret = m_busHandler->sendAndWait(master, slave);
 
+		libebus::Address address(master[1]);
+
 		if (ret == RESULT_OK) {
-			if (master[1] == BROADCAST)
+			if (address == BROADCAST)
 				return "done broadcast";
-			if (isMaster(master[1]))
+			if (address.isMaster())
 				return getResultCode(RESULT_OK);
 			return slave.getDataStr();
 		}
@@ -852,9 +860,9 @@ string MainLoop::executeFind(vector<string> &args)
 				}
 			}
 			if (verbose) {
-				unsigned char dstAddress = message->getDstAddress();
+				auto dstAddress = message->getDstAddress();
 				if (dstAddress != SYN)
-					sprintf(str, "%02x", dstAddress);
+					sprintf(str, "%02x", dstAddress.binAddr());
 				else if (lastup != 0 && message->getLastMasterData().size()>1)
 					sprintf(str, "%02x", message->getLastMasterData()[1]);
 				else
@@ -1188,7 +1196,7 @@ string MainLoop::executeGet(vector<string> &args, bool& connected)
 		time_t maxLastUp = 0;
 		for (auto it = messages.begin(); ret == RESULT_OK && it < messages.end();) {
 			auto message = *it++;
-			unsigned char dstAddress = message->getDstAddress();
+			auto dstAddress = message->getDstAddress();
 			if (dstAddress == SYN)
 				continue;
 			if (pollPriority > 0 && message->setPollPriority(pollPriority))
@@ -1221,7 +1229,7 @@ string MainLoop::executeGet(vector<string> &args, bool& connected)
 			result << "\n  \"" << message->getName() << "\": {";
 			result << "\n   \"lastup\": " << setw(0) << dec << static_cast<unsigned>(lastup);
 			if (lastup != 0) {
-				result << ",\n   \"zz\": \"" << setfill('0') << setw(2) << hex << static_cast<unsigned>(dstAddress) << "\"";
+				result << ",\n   \"zz\": \"" << setfill('0') << setw(2) << hex << static_cast<unsigned>(dstAddress.binAddr()) << "\"";
 				size_t pos = (size_t)result.tellp();
 				result << ",\n   \"fields\": {";
 				result_t dret = message->decodeLastData(result, (verbose?OF_VERBOSE:0)|(numeric?OF_NUMERIC:0)|OF_JSON);
@@ -1349,7 +1357,7 @@ string MainLoop::getUpdates(time_t since, time_t until)
 
 	for (auto it = messages.begin(); it < messages.end();) {
 		auto message = *it++;
-		unsigned char dstAddress = message->getDstAddress();
+		auto dstAddress = message->getDstAddress();
 		if (dstAddress == SYN)
 			continue;
 		time_t lastchg = message->getLastChangeTime();

@@ -30,6 +30,7 @@
 #include <vector>
 #include <map>
 #include <pthread.h>
+#include <Address.h>
 
 /** @file bushandler.h
  * Classes, functions, and constants related to handling of symbols on the eBUS.
@@ -164,7 +165,7 @@ public:
 	 * @param masterAddress the master bus address to use.
 	 * @return the result code.
 	 */
-	result_t prepare(unsigned char masterAddress);
+	result_t prepare(const libebus::Address &masterAddress);
 
 	// @copydoc
 	virtual bool notify(result_t result, SymbolString& slave);
@@ -215,7 +216,7 @@ public:
 	 * @param masterAddress the master bus address to use.
 	 * @return the result code.
 	 */
-	result_t prepare(unsigned char masterAddress);
+	result_t prepare(const libebus::Address &masterAddress);
 
 	// @copydoc
 	virtual bool notify(result_t result, SymbolString& slave);
@@ -310,17 +311,17 @@ public:
 	 * @param pollInterval the interval in seconds in which poll messages are cycled, or 0 if disabled.
 	 */
 	BusHandler(Device* device, MessageMap* messages,
-			const unsigned char ownAddress, const bool answer,
+			const libebus::Address ownAddress, const bool answer,
 			const unsigned int busLostRetries, const unsigned int failedSendRetries,
 			const unsigned int transferLatency, const unsigned int busAcquireTimeout, const unsigned int slaveRecvTimeout,
 			const unsigned int lockCount, const bool generateSyn,
 			const unsigned int pollInterval)
 		: m_device(device), m_messages(messages),
-		  m_ownMasterAddress(ownAddress), m_ownSlaveAddress((unsigned char)(ownAddress+5)), m_answer(answer),
+		  m_ownMasterAddress(ownAddress), m_ownSlaveAddress(ownAddress.binAddr()+5), m_answer(answer),
 		  m_busLostRetries(busLostRetries), m_failedSendRetries(failedSendRetries),
 		  m_transferLatency(transferLatency), m_busAcquireTimeout(busAcquireTimeout), m_slaveRecvTimeout(slaveRecvTimeout),
 		  m_autoLockCount(lockCount==0), m_lockCount(lockCount<=3 ? 3 : lockCount), m_remainLockCount(m_autoLockCount),
-		  m_generateSynInterval(generateSyn ? SYN_TIMEOUT*getMasterNumber(ownAddress)+SYMBOL_DURATION : 0),
+		  m_generateSynInterval(generateSyn ? SYN_TIMEOUT*ownAddress.getMasterNumber()+SYMBOL_DURATION : 0),
 		  m_pollInterval(pollInterval), m_command(false), m_response(false)
     {
 		memset(m_seenAddresses, 0, sizeof(m_seenAddresses));
@@ -388,7 +389,7 @@ public:
 	 * @param slave the @a SymbolString that will be filled with retrieved slave data.
 	 * @return the result code.
 	 */
-	result_t scanAndWait(unsigned char dstAddress, SymbolString& slave);
+	result_t scanAndWait(const libebus::Address& dstAddress, SymbolString& slave);
 
 	/**
 	 * Start or stop grabbing unknown messages.
@@ -464,7 +465,7 @@ private:
 	 * Add a seen bus address.
 	 * @param address the seen bus address.
 	 */
-	void addSeenAddress(unsigned char address);
+	void addSeenAddress(libebus::Address address);
 
 	/**
 	 * Called when a passive reception was successfully completed.
@@ -478,10 +479,10 @@ private:
 	MessageMap* m_messages;
 
 	/** the own master address. */
-	const unsigned char m_ownMasterAddress;
+	const libebus::Address m_ownMasterAddress;
 
 	/** the own slave address. */
-	const unsigned char m_ownSlaveAddress;
+	const libebus::Address m_ownSlaveAddress;
 
 	/** whether to answer queries for the own master/slave address. */
 	const bool m_answer;

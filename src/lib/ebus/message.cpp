@@ -20,6 +20,7 @@
 #include "data.h"
 #include "result.h"
 #include "symbol.h"
+#include "Address.h"
 #include <string>
 #include <vector>
 #include <cstring>
@@ -48,7 +49,7 @@ extern DataFieldTemplates* getTemplates(const string filename);
 
 Message::Message(const string& circuit, const string& name,
 		const bool isWrite, const bool isPassive, const string comment,
-		const unsigned char srcAddress, const unsigned char dstAddress,
+		const libebus::Address& srcAddress, const libebus::Address& dstAddress,
 		const vector<unsigned char> id,
 		shared_ptr<DataField> data,
 		const unsigned char pollPriority,
@@ -63,10 +64,10 @@ Message::Message(const string& circuit, const string& name,
 {
 	auto key = static_cast<unsigned long long>(id.size()-2) << (8 * 7 + 5);
 	if (isPassive)
-		key |= static_cast<unsigned long long>(getMasterNumber(srcAddress)) << (8 * 7); // 0..25
+		key |= static_cast<unsigned long long>(srcAddress.getMasterNumber()) << (8 * 7); // 0..25
 	else
 		key |= (isWrite ? 0x1fLL : 0x1eLL) << (8 * 7); // special values for active
-	key |= (unsigned long long)dstAddress << (8 * 6);
+	key |= (unsigned long long)dstAddress.binAddr() << (8 * 6);
 	int exp = 5;
 	for (vector<unsigned char>::const_iterator it = id.begin(); it < id.end(); it++) {
 		key ^= (unsigned long long)*it << (8 * exp--);
@@ -206,21 +207,21 @@ result_t Message::create(vector<string>::iterator& it, const vector<string>::ite
 	str = getDefault(*it++, defaults, defaultPos++).c_str(); // [QQ[;QQ]*]
 	if (it == end)
 		return RESULT_ERR_EOF;
-	unsigned char srcAddress;
+	libebus::Address srcAddress;
 	if (*str == 0)
 		srcAddress = SYN; // no specific source
 	else {
-		srcAddress = (unsigned char)parseInt(str, 16, 0, 0xff, result);
+		srcAddress = parseInt(str, 16, 0, 0xff, result);
 		if (result != RESULT_OK)
 			return result;
-		if (!isMaster(srcAddress))
+		if (not srcAddress.isMaster())
 			return RESULT_ERR_INVALID_ADDR;
 	}
 
 	str = getDefault(*it++, defaults, defaultPos++).c_str(); // [ZZ]
 	if (it == end)
 		 return RESULT_ERR_EOF;
-	vector<unsigned char> dstAddresses;
+	vector<libebus::Address> dstAddresses;
 	bool isBroadcastOrMasterDestination = false;
 	if (*str == 0) {
 		dstAddresses.push_back(SYN); // no specific destination
@@ -230,12 +231,12 @@ result_t Message::create(vector<string>::iterator& it, const vector<string>::ite
 		bool first = true;
 		while (getline(stream, token, VALUE_SEPARATOR)) {
 			FileReader::trim(token);
-			unsigned char dstAddress = (unsigned char)parseInt(token.c_str(), 16, 0, 0xff, result);
+			libebus::Address dstAddress = parseInt(token.c_str(), 16, 0, 0xff, result);
 			if (result != RESULT_OK)
 				return result;
-			if (!isValidAddress(dstAddress))
+			if (not dstAddress.isValid())
 				return RESULT_ERR_INVALID_ADDR;
-			bool broadcastOrMaster = (dstAddress == BROADCAST) || isMaster(dstAddress);
+			bool broadcastOrMaster = (dstAddress == BROADCAST) || dstAddress.isMaster();
 			if (first) {
 				isBroadcastOrMasterDestination = broadcastOrMaster;
 				first = false;
@@ -357,8 +358,8 @@ result_t Message::create(vector<string>::iterator& it, const vector<string>::ite
 	unsigned int index = 0;
 	bool multiple = dstAddresses.size()>1;
 	char num[10];
-	for (vector<unsigned char>::iterator it = dstAddresses.begin(); it != dstAddresses.end(); it++, index++) {
-		unsigned char dstAddress = *it;
+	for (const auto& dstAddress: dstAddresses) {
+
 		string useCircuit = circuit;
 		if (multiple) {
 			sprintf(num, ".%d", index);
@@ -374,7 +375,8 @@ result_t Message::create(vector<string>::iterator& it, const vector<string>::ite
 	return RESULT_OK;
 }
 
-shared_ptr<Message> Message::derive(const unsigned char dstAddress, const unsigned char srcAddress, const string circuit)
+shared_ptr<Message> Message::derive(const libebus::Address &dstAddress, const libebus::Address &srcAddress,
+									const string circuit)
 {
 	return make_shared<Message>(circuit.length()==0 ? m_circuit : circuit, m_name,
 		m_isWrite, m_isPassive, m_comment,
@@ -427,9 +429,9 @@ bool Message::checkId(Message& other)
 	return other.checkIdPrefix(m_id);
 }
 
-unsigned long long Message::getDerivedKey(const unsigned char dstAddress)
+unsigned long long Message::getDerivedKey(const libebus::Address &dstAddress)
 {
-	return (m_key & ~(0xffLL << (8*6))) | (unsigned long long)dstAddress << (8*6);
+	return (m_key & ~(0xffLL << (8*6))) | (unsigned long long)dstAddress.binAddr() << (8*6);
 }
 
 bool Message::setPollPriority(unsigned char priority)
@@ -463,24 +465,24 @@ bool Message::hasField(const char* fieldName, bool numeric)
 	return m_data->hasField(fieldName, numeric);
 }
 
-result_t Message::prepareMaster(const unsigned char srcAddress, SymbolString& masterData,
+result_t Message::prepareMaster(const libebus::Address srcAddress, SymbolString& masterData,
 		istringstream& input, char separator,
-		const unsigned char dstAddress, unsigned char index)
+		const libebus::Address dstAddress, unsigned char index)
 {
 	if (m_isPassive)
 		return RESULT_ERR_INVALID_ARG; // prepare not possible
 
 	SymbolString master(false);
-	result_t result = master.push_back(srcAddress, false, false);
+	result_t result = master.push_back(srcAddress.binAddr(), false, false);
 	if (result != RESULT_OK)
 		return result;
 	if (dstAddress == SYN) {
 		if (m_dstAddress == SYN)
 			return RESULT_ERR_INVALID_ADDR;
-		result = master.push_back(m_dstAddress, false, false);
+		result = master.push_back(m_dstAddress.binAddr(), false, false);
 	}
 	else
-		result = master.push_back(dstAddress, false, false);
+		result = master.push_back(dstAddress.binAddr(), false, false);
 	if (result != RESULT_OK)
 		return result;
 	result = master.push_back(m_id[0], false, false);
@@ -688,11 +690,11 @@ void Message::dumpColumn(ostream& output, size_t column, bool withConditions)
 		break;
 	case 4: // QQ
 		if (m_srcAddress != SYN)
-			output << hex << setw(2) << setfill('0') << static_cast<unsigned>(m_srcAddress);
+			output << hex << setw(2) << setfill('0') << static_cast<unsigned>(m_srcAddress.binAddr());
 		break;
 	case 5: // ZZ
 		if (m_dstAddress != SYN)
-			output << hex << setw(2) << setfill('0') << static_cast<unsigned>(m_dstAddress);
+			output << hex << setw(2) << setfill('0') << static_cast<unsigned>(m_dstAddress.binAddr());
 		break;
 	case 6: // PBSB
 		for (vector<unsigned char>::const_iterator it = m_id.begin(); it < m_id.begin()+2 && it < m_id.end(); it++) {
@@ -713,7 +715,7 @@ void Message::dumpColumn(ostream& output, size_t column, bool withConditions)
 
 ChainedMessage::ChainedMessage(const string &circuit, const string &name,
 							   const bool isWrite, const string comment,
-							   const unsigned char srcAddress, const unsigned char dstAddress,
+							   const libebus::Address& srcAddress, const libebus::Address& dstAddress,
 							   const vector<unsigned char> &id,
 							   const vector<vector<unsigned char>> &ids, const vector<unsigned char> &lengths,
 							   shared_ptr<DataField> data,
@@ -743,7 +745,8 @@ ChainedMessage::~ChainedMessage()
 {
 }
 
-shared_ptr<Message> ChainedMessage::derive(const unsigned char dstAddress, const unsigned char srcAddress, const string circuit)
+shared_ptr<Message> ChainedMessage::derive(const libebus::Address &dstAddress, const libebus::Address &srcAddress,
+										   const string circuit)
 {
 	return make_shared<ChainedMessage>(circuit.length()==0 ? m_circuit : circuit, m_name,
 		m_isWrite, m_comment,
@@ -1037,19 +1040,19 @@ result_t Condition::create(const string condName, vector<string>::iterator& it, 
 		it++; // comment
 	string field = it==end ? "" : *(it++); // fieldname
 	string zz = it==end ? "" : *(it++); // ZZ
-	unsigned char dstAddress = SYN;
+	libebus::Address dstAddress = SYN;
 	result_t result = RESULT_OK;
 	if (zz.length()==0)
 		zz = defaultDest;
 	if (zz.length()>0) {
-		dstAddress = (unsigned char)parseInt(zz.c_str(), 16, 0, 0xff, result);
+		dstAddress = parseInt(zz.c_str(), 16, 0, 0xff, result);
 		if (result != RESULT_OK)
 			return result;
-		if (dstAddress!=SYN && !isValidAddress(dstAddress, false))
+		if (dstAddress!=SYN && not dstAddress.isValid(false))
 			return RESULT_ERR_INVALID_ADDR;
 	}
 	if (name.length()==0) {
-		if (!isValidAddress(dstAddress, false) || isMaster(dstAddress))
+		if (not dstAddress.isValid(false) || dstAddress.isMaster())
 			return RESULT_ERR_INVALID_ADDR;
 	} else if (circuit.length()==0) {
 		circuit = defaultCircuit;
@@ -1123,7 +1126,7 @@ result_t SimpleCondition::resolve(MessageMap* messages, ostringstream& errorMess
 	shared_ptr<Message> message;
 	if (m_name.length()==0) {
 		message = messages->getScanMessage(m_dstAddress);
-		errorMessage << "scan condition " << nouppercase << setw(2) << hex << setfill('0') << static_cast<unsigned>(m_dstAddress);
+		errorMessage << "scan condition " << nouppercase << setw(2) << hex << setfill('0') << static_cast<unsigned>(m_dstAddress.binAddr());
 	} else {
 		message = messages->find(m_circuit, m_name, false);
 		if (!message)
@@ -1540,11 +1543,11 @@ result_t MessageMap::addFromFile(vector<string>::iterator& begin, const vector<s
 	return result;
 }
 
-shared_ptr<Message> MessageMap::getScanMessage(const unsigned char dstAddress)
+shared_ptr<Message> MessageMap::getScanMessage(const libebus::Address &dstAddress)
 {
 	if (dstAddress==SYN)
 		return m_scanMessage;
-	if (!isValidAddress(dstAddress, false) || isMaster(dstAddress))
+	if (!dstAddress.isValid(false) || dstAddress.isMaster())
 		return NULL;
 	unsigned long long key = m_scanMessage->getDerivedKey(dstAddress);
 	auto msgs = getByKey(key);
@@ -1652,11 +1655,11 @@ void MessageMap::addLoadedFile(unsigned char address, string file)
 		m_loadedFiles[address] += ", \""+file+"\"";
 }
 
-string MessageMap::getLoadedFiles(unsigned char address)
+string MessageMap::getLoadedFiles(const libebus::Address &address)
 {
-	if (m_loadedFiles.find(address)==m_loadedFiles.end())
+	if (m_loadedFiles.find(address.binAddr())==m_loadedFiles.end())
 		return "";
-	return m_loadedFiles[address];
+	return m_loadedFiles[address.binAddr()];
 }
 
 vector<shared_ptr<Message>>* MessageMap::getByKey(const unsigned long long key) {
@@ -1749,7 +1752,7 @@ shared_ptr<Message> MessageMap::find(SymbolString& master, bool anyDestination,
 		return NULL;
 	if (maxIdLength == 0 && anyDestination && master[2] == 0x07 && master[3] == 0x04)
 		return m_scanMessage;
-	unsigned long long baseKey = (unsigned long long)getMasterNumber(master[0]) << (8 * 7); // QQ address for passive message
+	unsigned long long baseKey = (unsigned long long)libebus::Address(master[0]).getMasterNumber() << (8 * 7); // QQ address for passive message
 	baseKey |= (unsigned long long)(anyDestination ? SYN : master[1]) << (8 * 6); // ZZ address
 	baseKey |= (unsigned long long)master[2] << (8 * 5); // PB
 	baseKey |= (unsigned long long)master[3] << (8 * 4); // SB
