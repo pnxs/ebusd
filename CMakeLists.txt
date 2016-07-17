@@ -19,8 +19,12 @@ add_subdirectory(src/ebusd)
 add_subdirectory(src/tools)
 add_subdirectory(src/lib/ebus/test)
 
-set(TEST_SOURCES src/lib/utils/tests/TestNotify.cpp)
+set(TEST_SOURCES
+        src/lib/utils/tests/TestNotify.cpp
+        src/lib/utils/tests/TestQueue.cpp
+        src/lib/ebus/tests/TestSymbolString.cpp
+        )
 add_executable(test_runner ${TEST_SOURCES})
-target_link_libraries(test_runner gtest gtest_main)
+target_link_libraries(test_runner ebus gtest gtest_main)
 
 # TODO: create config.h from config.h.in
