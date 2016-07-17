@@ -7,6 +7,8 @@ set(SOURCES
         queue.h
         notify.h
         cppconfig.h
-        )
+)
+
+add_subdirectory(tests)
 
 add_library(utils ${SOURCES})
