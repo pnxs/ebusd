@@ -17,9 +17,6 @@
  */
 
 #include "symbol.h"
-#include "result.h"
-#include <iostream>
-#include <iomanip>
 
 using std::stringstream;
 
@@ -49,12 +46,13 @@ static const unsigned char CRC_LOOKUP_TABLE[] =
 
 void SymbolString::addAll(const SymbolString& str)
 {
-	bool addCrc = m_unescapeState == 0;
-	bool isEscaped = str.m_unescapeState == 0;
-	vector<unsigned char> data = str.m_data;
-	for (size_t i = 0; i < data.size(); i++) {
-		push_back(data[i], isEscaped, addCrc);
+	bool addCrc = (m_unescapeState == 0);
+	bool isEscaped = (str.m_unescapeState == 0);
+
+	for (auto& d : str.m_data) {
+		push_back(d, isEscaped, addCrc);
 	}
+
 	if (addCrc)
 		push_back(m_crc, false, false); // add CRC
 }
@@ -62,29 +60,31 @@ void SymbolString::addAll(const SymbolString& str)
 result_t SymbolString::parseHex(const string& str, const bool isEscaped)
 {
 	bool addCrc = m_unescapeState == 0;
-	for (size_t i = 0; i < str.size(); i += 2) {
-		char* strEnd = NULL;
-		const char* strBegin = str.substr(i, 2).c_str();
-		unsigned long int value = strtoul(strBegin, &strEnd, 16);
+	try {
 
-		if (strEnd == NULL || strEnd != strBegin+2 || value > 0xff)
-			return RESULT_ERR_INVALID_NUM; // invalid value
+		for (size_t i = 0; i < str.size(); i += 2) {
+			auto value = std::stoul(str.substr(i, 2), 0, 16);
+			push_back((unsigned char) value, isEscaped, addCrc);
+		}
 
-		push_back((unsigned char)value, isEscaped, addCrc);
+		if (addCrc)
+			push_back(m_crc, false, false); // add CRC
 	}
-	if (addCrc)
-		push_back(m_crc, false, false); // add CRC
+	catch(const std::exception& e)
+	{
+		return RESULT_ERR_INVALID_NUM;
+	}
 
 	return RESULT_OK;
 }
 
-const string SymbolString::getDataStr(const bool unescape, const bool skipLastSymbol)
+string SymbolString::getDataStr(const bool unescape, const bool skipLastSymbol)
 {
 	stringstream sstr;
 	bool previousEscape = false;
 
 	for (size_t i = 0; i < m_data.size(); i++) {
-		unsigned char value = m_data[i];
+		auto value = m_data[i];
 		if (m_unescapeState == 0 && unescape && previousEscape) {
 			if (!skipLastSymbol || i+1 < m_data.size()) {
 				if (value == 0x00)
