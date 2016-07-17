@@ -80,7 +80,7 @@ public:
 	 * Creates a new empty escaped or unescaped instance.
 	 * @param escaped whether to create an escaped instance.
 	 */
-	SymbolString(const bool escaped=true) : m_unescapeState(escaped ? 0 : 1) {}
+	explicit SymbolString(const bool escaped=true) : m_unescapeState(escaped ? 0 : 1) {}
 
 	/**
 	 * Add all symbols from the other @a SymbolString and the calculated CRC if escaped.
