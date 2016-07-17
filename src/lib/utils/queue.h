@@ -20,7 +20,7 @@
 #define LIBUTILS_QUEUE_H_
 
 #include <list>
-#include <pthread.h>
+#include <thread>
 #include <errno.h>
 #include "clock.h"
 #include "cppconfig.h"
@@ -35,25 +35,8 @@
 template <typename T>
 class Queue
 {
-
 public:
-	/**
-	 * Constructor.
-	 */
-	Queue()
-	{
-		pthread_mutex_init(&m_mutex, NULL);
-		pthread_cond_init(&m_cond, NULL);
-	}
-
-	/**
-	 * Destructor.
-	 */
-	~Queue()
-	{
-		pthread_mutex_destroy(&m_mutex);
-		pthread_cond_destroy(&m_cond);
-	}
+	Queue() = default;
 
 private:
 
@@ -71,10 +54,10 @@ public:
 	 */
 	void push(T item)
 	{
-		pthread_mutex_lock(&m_mutex);
+		std::lock_guard<std::mutex> lock(m_mutex);
+
 		m_queue.push_back(item);
-		pthread_cond_broadcast(&m_cond);
-		pthread_mutex_unlock(&m_mutex);
+		m_cond.notify_all();
 	}
 
 	/**
@@ -85,13 +68,11 @@ public:
 	T pop(int timeout=0)
 	{
 		T item;
-		pthread_mutex_lock(&m_mutex);
+		std::unique_lock<std::mutex> lock(m_mutex);
+
 		if (timeout>0) {
-			struct timespec t;
-			clockGettime(&t);
-			t.tv_sec += timeout;
 			while (m_queue.empty()) {
-				if (pthread_cond_timedwait(&m_cond, &m_mutex, &t)==ETIMEDOUT)
+				if (m_cond.wait_for(lock, std::chrono::seconds(timeout)) == std::cv_status::timeout)
 					break;
 			}
 		}
@@ -101,7 +82,7 @@ public:
 			item = m_queue.front();
 			m_queue.pop_front();
 		}
-		pthread_mutex_unlock(&m_mutex);
+
 		return item;
 	}
 
@@ -114,7 +95,7 @@ public:
 	bool remove(T item, bool wait=false)
 	{
 		bool ret = false;
-		pthread_mutex_lock(&m_mutex);
+		std::unique_lock<std::mutex> lock(m_mutex);
 		do {
 			size_t oldSize = m_queue.size();
 			if (oldSize > 0) {
@@ -124,9 +105,9 @@ public:
 					break;
 				}
 			}
-			pthread_cond_wait(&m_cond, &m_mutex);
+			m_cond.wait(lock);
+
 		} while (wait);
-		pthread_mutex_unlock(&m_mutex);
 		return ret;
 	}
 
@@ -137,12 +118,11 @@ public:
 	T peek()
 	{
 		T item;
-		pthread_mutex_lock(&m_mutex);
+		std::lock_guard<std::mutex> lock(m_mutex);
 		if (m_queue.empty())
 			item = NULL;
 		else
 			item = m_queue.front();
-		pthread_mutex_unlock(&m_mutex);
 		return item;
 	}
 
@@ -151,10 +131,10 @@ private:
 	list<T> m_queue;
 
 	/** mutex variable for exclusive lock */
-	pthread_mutex_t m_mutex;
+	std::mutex m_mutex;
 
 	/** condition variable for exclusive lock */
-	pthread_cond_t m_cond;
+	std::condition_variable m_cond;
 
 };
 
