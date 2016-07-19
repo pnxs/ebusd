@@ -4,8 +4,8 @@ Makefile.in
 /build/*
 /aclocal.m4
 /autom4te.cache/
-/config.*
 /configure
+/config.h.in
 /ebusd*.tar.*
 /ebusd*.deb
 /stamp-h?
