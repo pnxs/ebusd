@@ -11,7 +11,9 @@ set(PACKAGE_LOGFILE "${LOCALSTATEDIR}/log/${PACKAGE_NAME}.log")
 
 #set(CXX clang++-3.8)
 #set(CMAKE_CXX_COMPILER clang++-3.8)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -std=c++14 -stdlib=libc++ -Wall")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -std=c++14 -stdlib=libc++ -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -std=c++14")
+
 # config.h checks
 include(ConfigureChecks.cmake)
 configure_file(config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h)
@@ -39,3 +41,4 @@ add_executable(test_runner ${TEST_SOURCES})
 target_link_libraries(test_runner ebus gtest gtest_main)
 
 # TODO: create config.h from config.h.in
+

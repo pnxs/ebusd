@@ -20,6 +20,8 @@
 #define LIBUTILS_THREAD_H_
 
 #include <thread>
+#include <mutex>
+#include <condition_variable>
 #include "cppconfig.h"
 
 /** \file thread.h */

@@ -21,6 +21,8 @@
 
 #include <list>
 #include <thread>
+#include <mutex>
+#include <condition_variable>
 #include <errno.h>
 #include "clock.h"
 #include "cppconfig.h"
