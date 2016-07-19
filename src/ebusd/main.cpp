@@ -642,16 +642,14 @@ static result_t readConfigFiles(const string path, const string extension, Messa
 		return result;
 
 	readTemplates(path, extension, hasTemplates, verbose);
-	for (vector<string>::iterator it = files.begin(); it != files.end(); it++) {
-		string name = *it;
+	for (const auto& name : files) {
 		logInfo(lf_main, "reading file %s", name.c_str());
 		result_t result = messages->readFromFile(name, verbose);
 		if (result != RESULT_OK)
 			return result;
 	}
 	if (recursive) {
-		for (vector<string>::iterator it = dirs.begin(); it != dirs.end(); it++) {
-			string name = *it;
+		for (const auto& name : dirs) {
 			logInfo(lf_main, "reading dir  %s", name.c_str());
 			result_t result = readConfigFiles(name, extension, messages, true, verbose);
 			if (result != RESULT_OK)
@@ -680,7 +678,7 @@ result_t loadConfigFiles(MessageMap* messages, bool verbose, bool denyRecursive)
 
 	for (auto& tp : templatesByPath)
 	{
-		if (tp.second!=&globalTemplates)
+		if (tp.second != &globalTemplates)
 			delete tp.second;
 	}
 	templatesByPath.clear();
@@ -772,6 +770,7 @@ result_t loadScanConfigFile(MessageMap* messages, libebus::Address address, Symb
 		logError(lf_main, "unable to load scan config %2.2x: no file from %s with prefix %s found", address, path.c_str(), prefix.c_str());
 		return RESULT_ERR_NOTFOUND;
 	}
+
 	for (string::iterator it = ident.begin(); it!=ident.end(); it++) {
 		if (::isspace(*it)) {
 			ident.erase(it--);
@@ -782,17 +781,22 @@ result_t loadScanConfigFile(MessageMap* messages, libebus::Address address, Symb
 	// complete name: cfgpath/MANUFACTURER/ZZ[.C[C[C[C[C]]]]][.circuit][.suffix][.*][.SWxxxx][.HWxxxx][.*].csv
 	size_t bestMatch = 0;
 	string best;
-	for (vector<string>::iterator it = files.begin(); it!=files.end(); it++) {
-		string name = *it;
+	for (const auto& name : files) {
 		libebus::Address checkDest;
-		string checkIdent, useCircuit, useSuffix;
-		unsigned int checkSw, checkHw;
+		string checkIdent;
+		string useCircuit;
+		string useSuffix;
+		unsigned int checkSw;
+		unsigned int checkHw;
+
 		if (!FileReader::extractDefaultsFromFilename(name.substr(path.length()+1), checkDest, checkIdent, useCircuit, useSuffix, checkSw, checkHw)) {
 			continue;
 		}
+
 		if (address!=checkDest || (checkSw!=UINT_MAX && sw!=checkSw) || (checkHw!=UINT_MAX && hw!=checkHw)) {
 			continue;
 		}
+
 		size_t match = 1;
 		if (!checkIdent.empty()) {
 			string remain = ident;
